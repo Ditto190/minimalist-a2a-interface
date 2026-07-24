@@ -5,6 +5,78 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-07-24
+
+Release grande: fecha a distância de recursos para os frameworks de
+orquestração de referência. Tudo abaixo é aditivo — o código escrito para a
+3.x continua funcionando.
+
+### Adicionado
+
+- 🌊 **Flows** (`mangaba.flows`) — orquestração orientada a eventos com `@start`,
+  `@listen`, `@router`, `@persist`, combinadores `and_`/`or_`, estado livre ou
+  tipado em Pydantic, checkpoints em SQLite com `resume()`/`fork()`, detecção de
+  ciclos e `plot()` gerando um grafo HTML autocontido
+- 📚 **Knowledge** (`mangaba.knowledge`) — base de conhecimento separada da
+  memória, com fontes String/Text/PDF/DOCX/CSV/Excel/JSON/URL/Diretório,
+  `results_limit`, `score_threshold` e escopo por agente ou por crew
+- 📄 **Loaders de documentos** — `PDFLoader`, `DOCXLoader`, `ExcelLoader`,
+  `JSONLoader` (com seletor estilo jq), `DirectoryLoader` e `load_file()`
+- 🧠 **`Memory` unificada** (`mangaba.memory.unified`) — recall composto
+  (similaridade + recência + importância), extração automática de fatos,
+  `consolidate()` para fundir duplicatas, gravação assíncrona e escopo
+  hierárquico. As classes antigas seguem intactas
+- 🖥️ **CLI** (`mangaba …`) — `create`, `run`, `test`, `train`, `chat`, `config`,
+  `reset-memories`, `version`, com projetos declarados em `agents.yaml`/`tasks.yaml`
+- 🎓 **Treino e avaliação** (`mangaba.training`) — `CrewTrainer` (feedback humano
+  iterativo, persistido em pickle) e `CrewEvaluator` (nota 1–10 por tarefa e agente)
+- 🏠 **Modelos locais** — `OllamaLLMProvider` e `OpenAICompatibleLLMProvider`
+  (vLLM, LM Studio, llama.cpp, LocalAI), com tool calling nativo, fallback por
+  prompt e `list_ollama_models()`. Não exigem API key
+- 🔌 **Cliente MCP** (`mangaba.tools.mcp_client`) — consome ferramentas de
+  servidores MCP externos como `BaseTool` nativas, via stdio ou HTTP, usando o
+  SDK oficial quando disponível e um transporte próprio como fallback
+- 🤝 **A2A aberto** (`mangaba.interop`) — `AgentCard`, `A2AServer` e `A2AClient`
+  para interoperar com agentes de outros frameworks. Distinto do
+  `protocols/a2a.py` interno, que é um barramento em processo
+- 👤 **Human-in-the-loop real** — `human_input=True` agora pausa de fato;
+  revisores plugáveis (`ConsoleHumanInput`, `CallbackHumanInput`,
+  `AutoApproveHumanInput`) e devolução do trabalho com as notas do revisor
+- 🤔 **`Agent(reasoning=True)`** — planeja e critica o próprio plano antes de agir
+- 📋 **`Crew(planning=True)`** — planeja todas as tarefas antes de começar
+- 👔 **`manager_agent` / `manager_llm`** — manager dedicado que escolhe o
+  especialista por tarefa e devolve o trabalho quando reprova
+- 🛡️ **`LLMGuardrail` e `FunctionGuardrail`** — critérios em linguagem natural
+  julgados por LLM; a rejeição volta como feedback via `guardrail_max_retries`
+- 🖼️ **Multimodal** — `Agent(multimodal=True)` e `images=` em todos os providers
+- 📊 **Observabilidade** (`mangaba.observability`) — OpenTelemetry, Langfuse,
+  MLflow e Arize Phoenix, com `auto_configure_from_env()`
+- 🧰 **Novas ferramentas** — `ScrapeWebsiteTool`, `HTTPRequestTool`,
+  `DocumentSearchTool`, `FileSearchTool`, `SQLQueryTool` (somente leitura),
+  `CodeInterpreterTool` (desligado por padrão) e um `ToolRegistry`
+- 🔍 **`start_trace()` / `current_trace_id()`** — um `trace_id` por execução que
+  sobrevive às threads de tarefas paralelas
+
+### Corrigido
+
+- **O `ReActEngine` descartava o system prompt e todo o contexto injetado**
+  quando o agente não tinha ferramentas: só a última mensagem era enviada. Na
+  prática, papel, objetivo, memória e conhecimento nunca chegavam ao modelo
+  nesse caminho
+- `ImageContent.mime_type` era sempre `image/png`, o que enviaria um `.jpg`
+  com o tipo errado para a Anthropic. A extensão do arquivo agora tem precedência
+- Versão divergia entre `pyproject.toml` (3.3.0), `setup.py` (3.2.0) e
+  `mangaba_ai.py` (2.0.1); agora há uma fonte única
+- `TestImports::test_main_package` fixava `"3.0.0"` e quebrava a cada release;
+  agora valida o formato, não o número
+
+### Alterado
+
+- O evento `LLM_END` passa a carregar `prompt_tokens`, `completion_tokens`,
+  `model` e `provider`, além do total
+- Sob processo hierárquico, tarefas podem ficar sem agente atribuído: o manager
+  escolhe. Com `manager_agent`/`manager_llm`, um único worker já basta
+
 ## [3.1.0] - 2026-04-22
 
 ### Adicionado

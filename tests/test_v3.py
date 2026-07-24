@@ -333,8 +333,13 @@ class TestCallbacks:
 
 class TestImports:
     def test_main_package(self):
+        import re
+
         import mangaba
-        assert mangaba.__version__ == "3.0.0"
+
+        # Pin the shape, not the number — this used to assert a literal and
+        # went stale the moment the package was released again.
+        assert re.match(r"^\d+\.\d+\.\d+", mangaba.__version__)
         assert hasattr(mangaba, "Agent")
         assert hasattr(mangaba, "Task")
         assert hasattr(mangaba, "Crew")

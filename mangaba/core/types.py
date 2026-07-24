@@ -75,7 +75,14 @@ class LLMConfig(BaseModel):
             "gpt": "openai", "chatgpt": "openai",
             "claude": "anthropic",
             "hf": "huggingface", "hugging-face": "huggingface",
-            "openrouter": "openrouter", "open-router":"openrouter", "or":"openrouter"
+            "openrouter": "openrouter", "open-router":"openrouter", "or":"openrouter",
+            # Local / self-hosted
+            "ollama": "ollama", "local": "ollama",
+            "openai-compatible": "openai_compatible",
+            "openai_compatible": "openai_compatible",
+            "vllm": "openai_compatible", "lmstudio": "openai_compatible",
+            "lm-studio": "openai_compatible", "llamacpp": "openai_compatible",
+            "llama-cpp": "openai_compatible", "localai": "openai_compatible",
         }
         return aliases.get(v.lower(), v.lower())
 
@@ -199,6 +206,24 @@ class AgentConfig(BaseModel):
     guardrails: List[str] = Field(default_factory=list)
     output_parser: Optional[str] = None
 
+    # Deliberation before acting
+    reasoning: bool = False
+    max_reasoning_attempts: int = Field(default=3, ge=1)
+
+    # Text + image input
+    multimodal: bool = False
+
+    # Execution limits
+    max_execution_time: Optional[int] = Field(default=None, ge=1)
+    max_rpm: Optional[int] = Field(default=None, ge=1)
+    respect_context_window: bool = True
+
+    # Prompt customisation
+    system_template: Optional[str] = None
+    prompt_template: Optional[str] = None
+    inject_date: bool = False
+    date_format: str = "%Y-%m-%d"
+
     @field_validator("role", "goal", "backstory")
     @classmethod
     def not_empty(cls, v: str) -> str:
@@ -219,6 +244,7 @@ class TaskConfig(BaseModel):
     async_execution: bool = False
     human_input: bool = False
     guardrails: List[str] = Field(default_factory=list)
+    guardrail_max_retries: int = Field(default=3, ge=0)
     output_parser: Optional[str] = None
     retry_on_failure: int = Field(default=0, ge=0)
 
@@ -233,6 +259,46 @@ class TaskConfig(BaseModel):
 # ---------------------------------------------------------------------------
 # Agent runtime state
 # ---------------------------------------------------------------------------
+
+class ReasoningOutput(BaseModel):
+    """Result of an agent's pre-execution deliberation.
+
+    Produced when ``Agent(reasoning=True)``: before touching any tool the agent
+    drafts a plan and judges whether it is ready to act. If it is not, it
+    refines the plan and tries again, up to ``max_reasoning_attempts``.
+    """
+
+    plan: str
+    ready: bool = False
+    attempts: int = 1
+    critique: str = ""
+
+    def as_prompt_section(self) -> str:
+        """Render the plan for injection into the execution prompt."""
+        return f"Your plan for this task:\n{self.plan}"
+
+
+class HumanFeedback(BaseModel):
+    """A human review collected during task execution."""
+
+    approved: bool = True
+    feedback: str = ""
+    revised_output: Optional[str] = None
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class ImageContent(BaseModel):
+    """An image supplied to a multimodal agent.
+
+    Exactly one of ``url`` or ``path`` / ``base64_data`` should be set.
+    """
+
+    url: Optional[str] = None
+    path: Optional[str] = None
+    base64_data: Optional[str] = None
+    mime_type: str = "image/png"
+    detail: str = "auto"
+
 
 class ReActStep(BaseModel):
     """A single step in the ReAct reasoning loop."""

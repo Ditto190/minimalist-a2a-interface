@@ -8,15 +8,60 @@ custom handlers.
 
 from __future__ import annotations
 
+import contextvars
 import logging
+import uuid
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Trace context
+# ---------------------------------------------------------------------------
+
+#: Identifies one logical run. A ``contextvar`` rather than a thread-local so
+#: it survives into asyncio tasks; threads need an explicit context copy (see
+#: ``Task.aexecute``).
+_current_trace_id: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "mangaba_trace_id", default=None
+)
+
+
+def current_trace_id() -> Optional[str]:
+    """Return the trace id of the run in progress, if any."""
+    return _current_trace_id.get()
+
+
+@contextmanager
+def start_trace(trace_id: Optional[str] = None) -> Iterator[str]:
+    """Group everything emitted inside the block under one trace id.
+
+    Nested calls keep the outermost id, so a crew invoked from inside a flow
+    stays part of the same trace instead of starting a second one.
+
+    Example::
+
+        with start_trace() as trace_id:
+            crew.kickoff()
+    """
+    existing = _current_trace_id.get()
+    if existing is not None and trace_id is None:
+        yield existing
+        return
+
+    resolved = trace_id or f"trace_{uuid.uuid4().hex[:16]}"
+    token = _current_trace_id.set(resolved)
+    try:
+        yield resolved
+    finally:
+        _current_trace_id.reset(token)
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +101,24 @@ class EventType(str, Enum):
     CREW_START = "crew_start"
     CREW_END = "crew_end"
     CREW_ERROR = "crew_error"
+
+    # Human-in-the-loop
+    HUMAN_INPUT_REQUEST = "human_input_request"
+    HUMAN_INPUT_RECEIVED = "human_input_received"
+
+    # Planning
+    PLAN_CREATED = "plan_created"
+
+    # Flow
+    FLOW_START = "flow_start"
+    FLOW_END = "flow_end"
+    FLOW_ERROR = "flow_error"
+    FLOW_METHOD_START = "flow_method_start"
+    FLOW_METHOD_END = "flow_method_end"
+    FLOW_METHOD_ERROR = "flow_method_error"
+    FLOW_ROUTE = "flow_route"
+    FLOW_STATE_SAVED = "flow_state_saved"
+    FLOW_RESUMED = "flow_resumed"
 
     # Memory
     MEMORY_ADD = "memory_add"
@@ -163,6 +226,10 @@ class EventBus:
 
     @classmethod
     def emit(cls, event: Event) -> None:
+        # Stamp the ambient trace so consumers can group a run's events even
+        # when they arrive from different threads
+        if event.trace_id is None:
+            event.trace_id = current_trace_id()
         cls._manager.emit(event)
 
     @classmethod

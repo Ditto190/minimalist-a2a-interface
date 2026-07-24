@@ -123,6 +123,22 @@ class ValidationError(MangabaError):
 
 
 # ---------------------------------------------------------------------------
+# Flows
+# ---------------------------------------------------------------------------
+
+class FlowError(MangabaError):
+    """Error in flow definition or execution."""
+
+
+class FlowCycleError(FlowError):
+    """Circular dependency detected in the listener graph."""
+
+
+class FlowPersistenceError(FlowError):
+    """Error saving, loading, or forking persisted flow state."""
+
+
+# ---------------------------------------------------------------------------
 # Memory / RAG
 # ---------------------------------------------------------------------------
 

@@ -189,9 +189,31 @@ class ReActEngine:
     def _call_llm(self, messages: List[Dict[str, Any]]) -> LLMResponse:
         if self.tools:
             return self.llm.generate_with_tools(messages, tools=self.tools)
-        # No tools — plain generation
-        user_content = messages[-1].get("content", "")
-        return self.llm.generate(user_content)
+        # No tools — plain generation over a single prompt
+        return self.llm.generate(self._flatten_messages(messages))
+
+    @staticmethod
+    def _flatten_messages(messages: List[Dict[str, Any]]) -> str:
+        """Collapse the conversation into one prompt.
+
+        Providers reached through ``generate()`` take a single string. Sending
+        only the last message would silently drop the system prompt and every
+        injected block — memory, knowledge, plans — so flatten the whole
+        exchange instead.
+        """
+        parts: List[str] = []
+        for msg in messages:
+            content = (msg.get("content") or "").strip()
+            if not content:
+                continue
+            role = msg.get("role", "user")
+            if role == "system":
+                parts.append(content)
+            elif role == "assistant":
+                parts.append(f"Assistant: {content}")
+            else:
+                parts.append(f"User: {content}")
+        return "\n\n".join(parts)
 
     def _execute_tool_calls(self, tool_calls: List[ToolCall]) -> List[ToolResult]:
         results: List[ToolResult] = []

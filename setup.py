@@ -8,10 +8,12 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 
 setup(
     name="mangaba",
-    version="3.2.0",
+    # Keep in step with pyproject.toml and mangaba/__init__.py — hatchling is
+    # the real build backend; this file is only a legacy shim.
+    version="4.0.0",
     author="Mangaba AI Team",
     author_email="contato@mangaba.ai",
-    description="Professional multi-agent AI framework with ReAct reasoning, RAG, memory, and function calling",
+    description="Professional multi-agent AI framework with event-driven flows, ReAct reasoning, RAG, knowledge bases, memory, MCP/A2A interop, and function calling",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/mangaba-ai/mangaba-ai",

@@ -16,18 +16,21 @@
 
 > Alternativa leve e completa a CrewAI + LangChain em um único pacote, com interoperabilidade real entre provedores, arquitetura resiliente e comunicação entre agentes via protocolos padrão.
 
-## ✨ Destaques v3.3.0
+## ✨ Destaques v4.0.0
 
-- 🤝 **Protocolos A2A & MCP** — Agent-to-Agent messaging com request/response/broadcast + Multi-Context Protocol para contextos hierárquicos entre agentes
-- 🗄️ **Vector Stores Avançadas** — ChromaDB, PostgreSQL+pgvector, Redis+RediSearch, SQLite + factory `create_vectorstore()` para troca transparente
-- 🧩 **Prompt Templates** — `PromptTemplate`, `ChatPromptTemplate`, `SystemPromptBuilder` para engenharia de prompt reutilizável
-- 📋 **Task Planner** — Decomposição automática de tarefas complexas em planos de execução com dependências
-- 🧰 **Toolkits** — Agrupamento lógico de ferramentas com `BaseToolkit`, `FileToolkit`, `WebToolkit`
-- 🤗 **HuggingFace Embeddings** — Sentence-transformers como terceiro provedor de embedding
-- 👤 **Entity Memory** — Rastreamento de entidades e relacionamentos entre interações
-- 📊 **UsageTracker** — Controle acumulativo de tokens por provedor em toda a execução
-- ⚙️ **Config System** — Configuração unificada via `Config` class com suporte a `.env` e JSON
-- 🔄 **CallbackManager** — Gerencie callbacks customizados com filtro por tipo de evento
+- 🌊 **Flows** — Orquestração orientada a eventos com `@start`, `@listen`, `@router`, combinadores `and_`/`or_`, estado tipado em Pydantic, persistência em SQLite (`@persist`, com resume e fork) e gráfico de execução em HTML via `flow.plot()`
+- 📚 **Knowledge** — Base de conhecimento separada da memória: PDF, DOCX, Excel, JSON, CSV, URL e diretórios inteiros, com `score_threshold` e escopo por agente ou por crew
+- 🧠 **Memória unificada** — Classe `Memory` com recall semântico composto (similaridade + recência + importância), extração automática de fatos, consolidação de duplicatas e gravação assíncrona
+- 🖥️ **CLI** — `mangaba create/run/test/train/chat/config/reset-memories`, com projetos declarados em `agents.yaml` / `tasks.yaml`
+- 🎓 **Treino e avaliação** — `mangaba train` (loop de feedback humano) e `mangaba test` (nota de qualidade 1–10 por tarefa e por agente)
+- 🏠 **Modelos locais** — Ollama e qualquer servidor OpenAI-compatible (vLLM, LM Studio, llama.cpp, LocalAI), com tool calling nativo e fallback automático
+- 🔌 **MCP (Model Context Protocol)** — Consuma ferramentas de servidores MCP externos como `BaseTool` nativas, via stdio ou HTTP
+- 👤 **Human-in-the-loop de verdade** — `human_input=True` pausa e devolve o trabalho ao agente com as notas do revisor; revisores plugáveis para rodar fora do terminal
+- 🤔 **Reasoning e Planning** — `Agent(reasoning=True)` planeja e critica o próprio plano antes de agir; `Crew(planning=True)` planeja todas as tarefas antes de começar
+- 👔 **Manager dedicado** — `manager_agent` / `manager_llm` delega dinamicamente ao especialista certo e devolve o trabalho quando reprova
+- 🛡️ **Guardrails com juiz LLM** — Critérios em linguagem natural; a rejeição volta como feedback para o agente corrigir, em vez de repetir o mesmo prompt
+- 🖼️ **Multimodal** — `Agent(multimodal=True)` aceita imagens junto do texto
+- 📊 **Observabilidade** — OpenTelemetry, Langfuse, MLflow e Arize Phoenix; um `trace_id` único costura a execução inteira, inclusive entre threads
 
 ### Features consolidadas (desde v3.0)
 
@@ -250,6 +253,205 @@ store.add(chunks)
 results = store.similarity_search("machine learning", k=5)
 ```
 
+## 🌊 Flows — orquestração orientada a eventos
+
+Crews coordenam agentes; Flows coordenam tudo o mais. Cada método reage ao
+resultado de outro, o estado é tipado, e o progresso pode ser persistido para
+retomar de onde parou.
+
+```python
+from pydantic import BaseModel
+from mangaba import Flow, start, listen, router, persist, and_
+
+class Estado(BaseModel):
+    texto: str = ""
+    risco: str = ""
+
+@persist                              # checkpoint a cada passo
+class Triagem(Flow):
+    state_model = Estado
+
+    @start()
+    def coletar(self):
+        self.state.texto = "contrato para revisar"
+        return self.state.texto
+
+    @listen(coletar)
+    def analisar(self, texto):
+        return "alto" if "contrato" in texto else "baixo"
+
+    @router(analisar)
+    def rotear(self, risco):
+        self.state.risco = risco
+        return "juridico" if risco == "alto" else "arquivo"
+
+    @listen("juridico")
+    def escalar(self):
+        return "enviado ao jurídico"
+
+    @listen("arquivo")
+    def arquivar(self):
+        return "arquivado"
+
+flow = Triagem()
+print(flow.kickoff())        # "enviado ao jurídico"
+print(flow.usage_metrics)    # tokens somados de tudo que rodou dentro
+flow.plot("triagem.html")    # gráfico de execução, HTML autocontido
+```
+
+`and_(a, b)` dispara só quando ambos terminam, `or_(a, b)` quando qualquer um
+terminar. Métodos podem ser `async def`. Para retomar após uma queda:
+
+```python
+resultado = Triagem().resume("6f1c...")   # pula os passos já concluídos
+ramo = Triagem().fork("6f1c...")          # ramifica a partir do checkpoint
+```
+
+## 📚 Knowledge — fundamentar respostas em documentos
+
+Diferente da memória (o que o agente viveu), a Knowledge é o que ele pode
+consultar. Aceita PDF, DOCX, Excel, JSON, CSV, URL e diretórios inteiros.
+
+```python
+from mangaba import Agent, Knowledge, PDFKnowledgeSource, DirectoryKnowledgeSource
+from mangaba.embeddings import OpenAIEmbedding
+
+conhecimento = Knowledge(
+    embedding=OpenAIEmbedding(api_key="..."),
+    sources=[
+        PDFKnowledgeSource(file_path="normas/nr12.pdf"),
+        DirectoryKnowledgeSource(path="politicas/", recursive=True),
+    ],
+    results_limit=3,
+    score_threshold=0.35,
+)
+
+agente = Agent(role="Auditor", goal="Verificar conformidade",
+               backstory="Especialista em segurança do trabalho",
+               knowledge=conhecimento)
+```
+
+Passe `knowledge=` para a `Crew` e todos os agentes que não têm base própria
+recebem a mesma.
+
+## 🧠 Memória com recall semântico
+
+A classe `Memory` pontua cada lembrança por similaridade, recência e
+importância — não só por parecido.
+
+```python
+from mangaba import Memory, MemoryScope
+
+memoria = Memory(embedding=embedding, db_path=".mangaba/memoria.db")
+memoria.add("O cliente prefere respostas curtas", metadata={"importance": 0.9})
+memoria.add_interaction("Qual meu plano?", "Você está no plano Pro anual.")
+
+memoria.consolidate()                    # funde duplicatas
+memoria.search("preferências", scope=MemoryScope.AGENT)
+
+agente = Agent(role="Suporte", goal="Atender bem", backstory="...", memory=memoria)
+```
+
+As classes antigas (`ShortTermMemory`, `LongTermMemory`, `EntityMemory`)
+continuam funcionando sem mudanças.
+
+## 👤 Human-in-the-loop
+
+`human_input=True` pausa de verdade: o revisor aprova, reescreve, ou devolve
+com notas — e as notas voltam para o agente corrigir.
+
+```python
+from mangaba import Task, CallbackHumanInput, HumanFeedback
+
+def revisar_no_slack(descricao, saida, papel):
+    resposta = slack.perguntar(f"{papel} respondeu:\n{saida}")
+    return HumanFeedback(approved=resposta == "ok", feedback=resposta)
+
+task = Task(
+    description="Redigir a resposta ao cliente",
+    expected_output="Um e-mail pronto para enviar",
+    agent=redator,
+    human_input=True,
+    human_input_handler=CallbackHumanInput(revisar_no_slack),
+    max_human_iterations=3,
+)
+```
+
+Sem handler, usa o terminal — e aprova sozinho quando não há terminal, para
+não travar execuções automatizadas.
+
+## 🤔 Reasoning, Planning e manager dedicado
+
+```python
+# O agente planeja e critica o próprio plano antes de agir
+agente = Agent(role="Analista", goal="...", backstory="...",
+               reasoning=True, max_reasoning_attempts=3)
+
+# A crew planeja todas as tarefas antes de começar, e um manager
+# dedicado escolhe quem faz o quê — e reprova o que não serve
+crew = Crew(
+    agents=[pesquisador, analista, redator],
+    tasks=[t1, t2, t3],
+    process=Process.HIERARCHICAL,
+    planning=True,
+    manager_llm=create_llm_client(provider="openai", api_key="..."),
+)
+```
+
+## 🛡️ Guardrails com juiz LLM
+
+```python
+from mangaba import LLMGuardrail, FunctionGuardrail
+
+task = Task(
+    description="Resumir o relatório",
+    expected_output="Um resumo com fontes",
+    agent=agente,
+    guardrails=[LLMGuardrail("Deve citar ao menos duas fontes com URL", llm=llm)],
+    guardrail_max_retries=3,   # a rejeição volta como feedback, não como repetição
+)
+```
+
+## 🖥️ CLI
+
+```bash
+mangaba create crew pesquisa   # esqueleto com agents.yaml e tasks.yaml
+cd pesquisa && cp .env.example .env
+mangaba run --input topic="energia solar em Alagoas"
+
+mangaba test -n 3              # nota de qualidade por tarefa e por agente
+mangaba train -n 5             # loop de feedback humano, salvo em pickle
+mangaba chat                   # REPL contra um agente
+mangaba config                 # mostra provedor/modelo (nunca a chave)
+mangaba reset-memories --all
+```
+
+## 🔌 MCP — ferramentas de servidores externos
+
+```python
+from mangaba import Agent, MCPClient
+
+with MCPClient(command=["npx", "-y", "@modelcontextprotocol/server-filesystem", "/dados"]) as mcp:
+    agente = Agent(role="Analista", goal="...", backstory="...",
+                   tools=mcp.get_tools())
+```
+
+Funciona por stdio ou HTTP, com o SDK oficial `mcp` quando disponível e um
+transporte próprio sem dependências como fallback.
+
+## 📊 Observabilidade
+
+```python
+from mangaba import auto_configure_from_env, OpenTelemetryCallback, configure_observability
+
+auto_configure_from_env()                          # liga o que estiver no ambiente
+configure_observability(OpenTelemetryCallback())   # ou explicitamente
+```
+
+Integra com OpenTelemetry (OTLP), Langfuse, MLflow e Arize Phoenix. Cada
+execução recebe um `trace_id` que sobrevive inclusive às threads de tarefas
+paralelas, então a crew inteira aparece como um trace só.
+
 ## 🗄️ Vector Stores
 
 | Store | Persistência | Ideal para |
@@ -365,7 +567,8 @@ mangaba/
 │   ├── base.py                 # BaseMemory ABC
 │   ├── short_term.py           # Sliding window (deque)
 │   ├── long_term.py            # SQLite + embeddings opcionais
-│   └── entity.py               # Memória de entidades
+│   ├── entity.py               # Memória de entidades
+│   └── unified.py              # Memory: recall composto + consolidação
 ├── embeddings/             # Provedores de embedding
 │   ├── base.py                 # BaseEmbedding ABC
 │   ├── openai_embed.py         # text-embedding-3-small
@@ -385,11 +588,31 @@ mangaba/
 │   ├── splitters.py            # RecursiveTextSplitter
 │   ├── retriever.py            # Embedding + vector store
 │   └── chain.py                # RAGChain com fontes
-├── callbacks/              # Observabilidade
+├── flows/                  # Orquestração orientada a eventos
+│   ├── flow.py                 # Flow, @start/@listen/@router/@persist, and_/or_
+│   ├── state.py                # Estado livre (dict) ou tipado (Pydantic)
+│   ├── persistence.py          # Checkpoints em SQLite, resume e fork
+│   └── visualization.py        # plot(): grafo de execução em HTML
+├── knowledge/              # Base de conhecimento (RAG de documentos)
+│   ├── knowledge.py            # Knowledge: ingestão, query, threshold
+│   └── sources.py              # PDF, DOCX, Excel, JSON, CSV, URL, diretório
+├── observability/          # Tracing externo
+│   ├── otel.py                 # OpenTelemetry (OTLP)
+│   ├── langfuse.py             # Langfuse
+│   ├── mlflow.py               # MLflow
+│   └── phoenix.py              # Arize Phoenix
+├── training/               # Treino e avaliação
+│   ├── trainer.py              # mangaba train — feedback humano iterativo
+│   └── evaluator.py            # mangaba test — nota 1–10 por tarefa
+├── cli/                    # Interface de linha de comando
+│   ├── main.py                 # create/run/test/train/chat/config/reset
+│   └── templates/              # Esqueletos de projeto gerados
+├── callbacks/              # Observabilidade local
 │   ├── console.py              # Print formatado de eventos
 │   └── file.py                 # Log JSONL
 ├── __init__.py              # API pública do pacote
-├── config.py                # Config system (leituta .env)
+├── config.py                # Config system (leitura .env)
+├── config_loader.py         # agents.yaml / tasks.yaml → Agent/Task/Crew
 └── exceptions.py            # (legado)
 
 protocols/                 # Protocolos de comunicação entre agentes
@@ -449,6 +672,22 @@ examples/                  # Exemplos práticos
 | **OpenAI** | ✅ Nativo | ✅ | `gpt-4o-mini` |
 | **Anthropic** | ✅ Nativo (tool_use) | ✅ | `claude-3-haiku-20240307` |
 | **HuggingFace** | ✅ Nativo (11 modelos) / ⚠️ Prompt (14 modelos) | ✅ via `chat_completion` | `mistralai/Mistral-7B-Instruct-v0.3` |
+| **Ollama** | ✅ Nativo + fallback por prompt | ✅ | roda 100% local, sem API key |
+| **OpenAI-compatible** | ✅ Nativo | ✅ | vLLM, LM Studio, llama.cpp, LocalAI |
+
+### 🏠 Modelos locais
+
+Nem Ollama nem os servidores OpenAI-compatible exigem API key:
+
+```python
+from mangaba import create_llm_client, list_ollama_models
+
+print(list_ollama_models())          # o que já está instalado localmente
+
+llm = create_llm_client(provider="ollama", model="qwen2.5:7b")
+llm = create_llm_client(provider="vllm", model="meta-llama/Llama-3.1-8B-Instruct",
+                        base_url="http://localhost:8000/v1")
+```
 
 Configure via variáveis de ambiente:
 
@@ -513,7 +752,14 @@ hf_model_supports_tools("google/gemma-2-9b-it")                # False — promp
 - `redis>=5.0.0` — Redis vector store (`pip install mangaba[redis]`)
 - `psycopg[binary]>=3.1.0` — Postgres vector store (`pip install mangaba[postgres]`)
 - `chromadb>=0.4.0` — ChromaDB vector store (`pip install mangaba[chroma]`)
+- `pypdf`, `python-docx`, `openpyxl`, `beautifulsoup4` — Loaders de documentos (`pip install mangaba[documents]`)
+- `pyyaml>=6.0` — Projetos declarativos da CLI (`pip install mangaba[yaml]`)
+- `mcp>=1.0.0` — SDK oficial do MCP; há fallback sem dependência (`pip install mangaba[mcp]`)
+- OpenTelemetry / Langfuse / MLflow / Phoenix — Tracing (`pip install mangaba[otel]`, `[langfuse]`, `[mlflow]`, `[phoenix]`, ou `[observability]`)
 - **Tudo:** `pip install mangaba[all]`
+
+Modelos locais (Ollama, vLLM, LM Studio, llama.cpp, LocalAI) não precisam de
+nenhum extra — usam o cliente `openai`, que já é dependência do núcleo.
 
 ## 🧪 Testes
 

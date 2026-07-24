@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mangaba"
-version = "3.3.0"
-description = "Professional multi-agent AI framework with ReAct reasoning, RAG, memory, and function calling"
+version = "4.0.0"
+description = "Professional multi-agent AI framework with event-driven flows, ReAct reasoning, RAG, knowledge bases, memory, MCP/A2A interop, and function calling"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -49,6 +49,9 @@ dependencies = [
     "tiktoken>=0.5.0",
 ]
 
+[project.scripts]
+mangaba = "mangaba.cli.main:main"
+
 [project.optional-dependencies]
 tools = [
     "duckduckgo-search>=3.9.0",
@@ -56,6 +59,48 @@ tools = [
 
 rag = [
     "numpy>=1.24.0",
+]
+
+documents = [
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
+    "openpyxl>=3.1.0",
+    "beautifulsoup4>=4.12.0",
+]
+
+yaml = [
+    "pyyaml>=6.0",
+]
+
+mcp = [
+    "mcp>=1.0.0",
+]
+
+otel = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0",
+]
+
+langfuse = [
+    "langfuse>=2.0.0",
+]
+
+mlflow = [
+    "mlflow>=2.14.0",
+]
+
+phoenix = [
+    "arize-phoenix-otel>=0.6.0",
+]
+
+observability = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.20.0",
+    "langfuse>=2.0.0",
+    "mlflow>=2.14.0",
+    "arize-phoenix-otel>=0.6.0",
 ]
 
 embeddings = [
@@ -82,6 +127,11 @@ all = [
     "redis>=5.0.0",
     "psycopg[binary]>=3.1.0",
     "chromadb>=0.4.0",
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
+    "openpyxl>=3.1.0",
+    "beautifulsoup4>=4.12.0",
+    "pyyaml>=6.0",
 ]
 
 dev = [
