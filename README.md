@@ -439,6 +439,66 @@ with MCPClient(command=["npx", "-y", "@modelcontextprotocol/server-filesystem", 
 Funciona por stdio ou HTTP, com o SDK oficial `mcp` quando disponível e um
 transporte próprio sem dependências como fallback.
 
+## 🤝 A2A — interoperar com agentes de outros frameworks
+
+O protocolo aberto Agent2Agent. Não confundir com `protocols/a2a.py`, que é o
+barramento interno de mensagens entre agentes do próprio processo.
+
+```python
+from mangaba import A2AServer, A2AClient, agent_card_for
+
+# Expor um agente (ou uma Crew) para o mundo
+servidor = A2AServer(agente, host="127.0.0.1", port=0)
+servidor.start()
+print(agent_card_for(agente).model_dump_json(by_alias=True, indent=2))
+
+# Consumir um agente remoto — de qualquer framework — como ferramenta local
+cliente = A2AClient("https://parceiro.exemplo/agent")
+meu_agente = Agent(role="Coordenador", goal="...", backstory="...",
+                   tools=[cliente.as_tool()])
+```
+
+O card é servido em `/.well-known/agent.json`; as tarefas transitam por
+`submitted → working → completed | failed`.
+
+## 🧰 Ferramentas incluídas
+
+| Ferramenta | O que faz |
+|---|---|
+| `ScrapeWebsiteTool` | Baixa uma página e extrai o texto legível |
+| `HTTPRequestTool` | Chamada REST genérica |
+| `DocumentSearchTool` | Busca semântica *dentro* de um arquivo (PDF, DOCX, Excel…) |
+| `FileSearchTool` | Busca literal ou regex numa árvore de diretórios |
+| `SQLQueryTool` | SQL somente leitura em SQLite ou PostgreSQL |
+| `CodeInterpreterTool` | Executa Python — **desligado por padrão** |
+| `MCPClient.get_tools()` | Ferramentas vindas de servidores MCP externos |
+| `A2AClient.as_tool()` | Um agente remoto como ferramenta local |
+
+Resolva qualquer uma pelo nome curto no YAML (`http_request`, `sql_query`, …)
+ou via `ToolRegistry`.
+
+### ⚠️ Antes de usar em produção
+
+- **`CodeInterpreterTool` executa código escrito pelo modelo.** Exige
+  `enabled=True`; usa Docker isolado quando disponível. `unsafe_mode=True`
+  roda direto no host, com todos os privilégios do processo — inclusive acesso
+  a arquivos e variáveis de ambiente com credenciais.
+- **`A2AServer` não tem TLS nem autenticação.** O padrão é escutar em
+  `127.0.0.1`. Quem alcançar a porta faz seu agente trabalhar e gasta seu
+  orçamento de LLM. Coloque atrás de um proxy autenticado antes de expor.
+- **`A2AClient.as_tool()` traz a resposta de um agente de terceiros para
+  dentro do seu contexto** — é um canal de prompt injection. Aponte só para
+  agentes em que você confia.
+- **`HTTPRequestTool` / `ScrapeWebsiteTool`** recusam esquemas que não sejam
+  `http(s)`, mas não bloqueiam endereços privados por padrão. Use
+  `block_private_hosts=True` contra SSRF e `allowed_domains=[...]` para fixar
+  os destinos.
+- **`SQLQueryTool`** valida a instrução, abre a conexão em modo somente
+  leitura e sempre usa parâmetros — ainda assim, dê a ele um usuário de banco
+  com privilégio mínimo.
+- **`FileSearchTool`** sem `root_dir` lê qualquer coisa que o processo possa
+  ler. Sempre passe `root_dir` quando o caminho puder vir do modelo.
+
 ## 📊 Observabilidade
 
 ```python
@@ -764,15 +824,33 @@ nenhum extra — usam o cliente `openai`, que já é dependência do núcleo.
 ## 🧪 Testes
 
 ```bash
-# Testes v3
-python -m pytest tests/test_v3.py -v
-
-# Todos os testes (14 suites)
+# Todos os testes
 python -m pytest tests/ -v
 
-# Com cobertura (mínimo 80%)
+# Só os que não tocam a rede
+python -m pytest -m "not network"
+
+# Com cobertura (opt-in)
 python -m pytest tests/ --cov=mangaba --cov-report=term-missing
 ```
+
+### Testes contra modelo real
+
+`tests/test_gateway_integration.py` aponta o framework para o
+[Mangaba Gateway](https://mangaba.ngrok.app) — modelos GGUF locais de verdade —
+em vez de stubs. Cobre agente, crew, knowledge com embeddings reais, memória,
+guardrail com juiz LLM, revisão humana e propagação de trace.
+
+```bash
+python -m pytest tests/test_gateway_integration.py -v
+```
+
+O arquivo inteiro é pulado automaticamente quando o gateway está fora do ar,
+então rodar offline continua verde. Entre esses testes há um guarda de
+regressão para um bug que existia até a v4.0.0: um agente sem ferramentas
+descartava o system prompt, então nada de papel, memória ou conhecimento
+chegava ao modelo. O teste dá ao agente uma regra que só existe no backstory e
+verifica se o modelo a obedece.
 
 ## 🤝 Contribuição
 

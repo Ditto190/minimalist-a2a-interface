@@ -136,10 +136,24 @@ from mangaba.training import (
     apply_training_data,
 )
 
+# ── Interop: open Agent2Agent protocol ─────────────────────────────────
+from mangaba.interop import (
+    A2AClient,
+    A2AServer,
+    AgentCard,
+    AgentSkill,
+    agent_card_for,
+)
+
 # ── Tools ──────────────────────────────────────────────────────────────
 from mangaba.tools.base import BaseTool
 from mangaba.tools.decorator import tool
 from mangaba.tools.mcp_client import MCPClient
+from mangaba.tools.registry import REGISTRY, ToolRegistry
+from mangaba.tools.web_tools import HTTPRequestTool, ScrapeWebsiteTool
+from mangaba.tools.document_tools import DocumentSearchTool, FileSearchTool
+from mangaba.tools.code_tools import CodeInterpreterTool
+from mangaba.tools.data_tools import SQLQueryTool
 
 __version__ = "4.0.0"
 
@@ -237,10 +251,24 @@ __all__ = [
     "EvaluationResult",
     "TrainingResult",
     "apply_training_data",
+    # Interop (open A2A)
+    "A2AServer",
+    "A2AClient",
+    "AgentCard",
+    "AgentSkill",
+    "agent_card_for",
     # Tools
     "BaseTool",
     "tool",
     "MCPClient",
+    "ToolRegistry",
+    "REGISTRY",
+    "ScrapeWebsiteTool",
+    "HTTPRequestTool",
+    "DocumentSearchTool",
+    "FileSearchTool",
+    "CodeInterpreterTool",
+    "SQLQueryTool",
     # Types
     "LLMConfig",
     "OpenRouterConfig",

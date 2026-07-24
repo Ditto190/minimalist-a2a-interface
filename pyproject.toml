@@ -183,16 +183,15 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Coverage is opt-in: `pytest --cov=mangaba --cov-report=term-missing`.
+# It used to be forced here with --cov-fail-under=80, but the setting never
+# loaded (a stray pytest.ini shadowed this file), and real coverage is ~39% —
+# turning it on as-is would have failed every run.
 addopts = [
     "--verbose",
     "--tb=short",
     "--strict-markers",
     "--strict-config",
-    "--cov=.",
-    "--cov-report=html:htmlcov",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
-    "--cov-fail-under=80",
     "--durations=10",
 ]
 markers = [

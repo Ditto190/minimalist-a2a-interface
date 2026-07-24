@@ -50,6 +50,14 @@ TOOL_REGISTRY: Dict[str, str] = {
     "duckduckgo_search": "mangaba.tools.web_search:DuckDuckGoSearchTool",
 }
 
+# The tool registry contributes its own built-ins to the table above. Import it
+# here so YAML can address them whether or not the caller touched the registry
+# first — otherwise resolution would depend on import order.
+from mangaba.tools.registry import BUILTIN_TOOLS as _BUILTIN_TOOLS  # noqa: E402
+
+for _name, _target in _BUILTIN_TOOLS.items():
+    TOOL_REGISTRY.setdefault(_name, _target)
+
 #: Environment variables holding an API key, per provider.
 PROVIDER_KEY_ENVS: Dict[str, List[str]] = {
     "google": ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
