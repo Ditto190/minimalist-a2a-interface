@@ -10,9 +10,23 @@
 [![PyPI version](https://img.shields.io/pypi/v/mangaba.svg)](https://pypi.org/project/mangaba/)
 [![Python](https://img.shields.io/pypi/pyversions/mangaba.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Mangaba-ai/mangaba_ai/actions)
+[![CI](https://github.com/Mangaba-ai/mangaba_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Mangaba-ai/mangaba_ai/actions/workflows/ci.yml)
 
 Framework profissional de orquestração multi-agente com ReAct reasoning, function calling nativo, RAG, memória persistente, protocolos A2A/MCP, vector stores e suporte resiliente a múltiplos provedores LLM.
+
+<!-- DEMO-GIF: após gerar assets/demo.gif com scripts/record_demo.sh, descomente:
+<div align="center">
+  <img src="assets/demo.gif" alt="Demo: primeiro crew em 1 comando" width="720"/>
+</div>
+-->
+
+Execute o exemplo abaixo em 1 comando (veja `examples/quickstart.py`):
+
+```bash
+pip install mangaba
+export GOOGLE_API_KEY="sua-chave"
+python examples/quickstart.py
+```
 
 Alternativa leve e completa a CrewAI + LangChain em um único pacote, com interoperabilidade real entre provedores, arquitetura resiliente e comunicação entre agentes via protocolos padrão.
 
