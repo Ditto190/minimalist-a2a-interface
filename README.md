@@ -5,49 +5,60 @@
   [![Site](https://img.shields.io/badge/mangaba.ia.br-1E0D01?style=for-the-badge)](https://www.mangaba.ia.br)
 </div>
 
-# 🥭 Mangaba AI
+# Mangaba AI
 
 [![PyPI version](https://img.shields.io/pypi/v/mangaba.svg)](https://pypi.org/project/mangaba/)
 [![Python](https://img.shields.io/pypi/pyversions/mangaba.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/Mangaba-ai/mangaba_ai/actions)
 
-**Framework profissional de orquestração multi-agente** com ReAct reasoning, function calling nativo, RAG, memória persistente, protocolos A2A/MCP, vector stores avançadas e suporte resiliente a múltiplos provedores LLM.
+Framework profissional de orquestração multi-agente com ReAct reasoning, function calling nativo, RAG, memória persistente, protocolos A2A/MCP, vector stores e suporte resiliente a múltiplos provedores LLM.
 
-> Alternativa leve e completa a CrewAI + LangChain em um único pacote, com interoperabilidade real entre provedores, arquitetura resiliente e comunicação entre agentes via protocolos padrão.
+Alternativa leve e completa a CrewAI + LangChain em um único pacote, com interoperabilidade real entre provedores, arquitetura resiliente e comunicação entre agentes via protocolos padrão.
 
-## ✨ Destaques v4.0.0
+## Destaques da v4.0.0
 
-- 🌊 **Flows** — Orquestração orientada a eventos com `@start`, `@listen`, `@router`, combinadores `and_`/`or_`, estado tipado em Pydantic, persistência em SQLite (`@persist`, com resume e fork) e gráfico de execução em HTML via `flow.plot()`
-- 📚 **Knowledge** — Base de conhecimento separada da memória: PDF, DOCX, Excel, JSON, CSV, URL e diretórios inteiros, com `score_threshold` e escopo por agente ou por crew
-- 🧠 **Memória unificada** — Classe `Memory` com recall semântico composto (similaridade + recência + importância), extração automática de fatos, consolidação de duplicatas e gravação assíncrona
-- 🖥️ **CLI** — `mangaba create/run/test/train/chat/config/reset-memories`, com projetos declarados em `agents.yaml` / `tasks.yaml`
-- 🎓 **Treino e avaliação** — `mangaba train` (loop de feedback humano) e `mangaba test` (nota de qualidade 1–10 por tarefa e por agente)
-- 🏠 **Modelos locais** — Ollama e qualquer servidor OpenAI-compatible (vLLM, LM Studio, llama.cpp, LocalAI), com tool calling nativo e fallback automático
-- 🔌 **MCP (Model Context Protocol)** — Consuma ferramentas de servidores MCP externos como `BaseTool` nativas, via stdio ou HTTP
-- 👤 **Human-in-the-loop de verdade** — `human_input=True` pausa e devolve o trabalho ao agente com as notas do revisor; revisores plugáveis para rodar fora do terminal
-- 🤔 **Reasoning e Planning** — `Agent(reasoning=True)` planeja e critica o próprio plano antes de agir; `Crew(planning=True)` planeja todas as tarefas antes de começar
-- 👔 **Manager dedicado** — `manager_agent` / `manager_llm` delega dinamicamente ao especialista certo e devolve o trabalho quando reprova
-- 🛡️ **Guardrails com juiz LLM** — Critérios em linguagem natural; a rejeição volta como feedback para o agente corrigir, em vez de repetir o mesmo prompt
-- 🖼️ **Multimodal** — `Agent(multimodal=True)` aceita imagens junto do texto
-- 📊 **Observabilidade** — OpenTelemetry, Langfuse, MLflow e Arize Phoenix; um `trace_id` único costura a execução inteira, inclusive entre threads
+- **Flows** — Orquestração orientada a eventos com `@start`, `@listen`, `@router`, combinadores `and_`/`or_`, estado tipado em Pydantic, persistência em SQLite (`@persist`, com resume e fork) e gráfico de execução em HTML via `flow.plot()`
+- **Knowledge** — Base de conhecimento separada da memória: PDF, DOCX, Excel, JSON, CSV, URL e diretórios inteiros, com `score_threshold` e escopo por agente ou por crew
+- **Memória unificada** — Classe `Memory` com recall semântico composto (similaridade + recência + importância), extração automática de fatos, consolidação de duplicatas e gravação assíncrona
+- **CLI** — `mangaba create/run/test/train/chat/config/reset-memories/replay/install`, com projetos declarados em `agents.yaml` / `tasks.yaml`
+- **Treino e avaliação** — `mangaba train` (loop de feedback humano) e `mangaba test` (nota de qualidade 1–10 por tarefa e por agente)
+- **Modelos locais** — Ollama e qualquer servidor OpenAI-compatible (vLLM, LM Studio, llama.cpp, LocalAI), com tool calling nativo e fallback automático
+- **MCP (Model Context Protocol)** — Consuma ferramentas de servidores MCP externos como `BaseTool` nativas, via stdio ou HTTP
+- **Human-in-the-loop** — `human_input=True` pausa e devolve o trabalho ao agente com as notas do revisor; revisores plugáveis para rodar fora do terminal
+- **Reasoning e Planning** — `Agent(reasoning=True)` planeja e critica o próprio plano antes de agir; `Crew(planning=True)` planeja todas as tarefas antes de começar
+- **Manager dedicado** — `manager_agent` / `manager_llm` delega dinamicamente ao especialista certo e devolve o trabalho quando reprova
+- **Guardrails com juiz LLM** — Critérios em linguagem natural; a rejeição volta como feedback para o agente corrigir, em vez de repetir o mesmo prompt
+- **Multimodal** — `Agent(multimodal=True)` aceita imagens junto do texto
+- **Observabilidade** — OpenTelemetry, Langfuse, MLflow e Arize Phoenix; um `trace_id` único costura a execução inteira, inclusive entre threads
 
-### Features consolidadas (desde v3.0)
+### Compatibilidade com CrewAI
 
-- 🚀 **OpenRouter Native Support** — Roteamento dinâmico com fallback automático entre modelos
-- 🔄 **Multi-Provider Interoperability** — Misture agentes de diferentes provedores (ex: Gemini + Llama) na mesma Crew
-- 🧠 **ReAct Reasoning** — Loop Thought→Action→Observation com function calling nativo
-- 🤖 **5 Provedores LLM** — Google Gemini, OpenAI GPT, Anthropic Claude, HuggingFace e OpenRouter
-- 👥 **4 Processos de Crew** — Sequential, Hierarchical, Parallel (asyncio), Consensual
-- 🔧 **Tool System** — `@tool` decorator, Pydantic schemas, JSON schema automático para LLM
-- 📚 **RAG Pipeline** — Document loaders, text splitters, embeddings, vector store, retriever
-- 💾 **Memória** — Curto prazo (sliding window), longo prazo (SQLite), entidades
-- 🛡️ **Guardrails** — Validação de tamanho, filtro de conteúdo, schema validation
-- 📊 **Observabilidade** — EventBus com 22+ tipos de evento, callbacks console/arquivo
-- 🔄 **Workflow Engine** — Pipelines com stages sequenciais, paralelos e condicionais
-- ⚡ **Cache & Retry** — Cache LRU + disco (SQLite), retry com backoff exponencial + fallback automático
+O Mangaba implementa as principais primitivas do CrewAI OSS, com a mesma nomenclatura quando aplicável:
 
-## 🚀 Instalação
+- **Crew** — `akickoff()`, `kickoff_for_each()`, `replay(task_id)`, `train()`/`test()`, `before/after_kickoff_callbacks`, `output_log_file`, `usage_metrics`/`token_usage`, `CrewOutput(raw, pydantic, json_dict)`, `function_calling_llm`
+- **Task** — `output_pydantic`/`output_json`, `guardrail` (singular), `max_retries`, `depends_on`, `condition`
+- **Agent** — `max_iter`, `max_retry_limit`, `kickoff()` direto, `step_callback` por etapa
+- **Tools** — `arun()` assíncrono, `cache_function`, `max_retries`, `max_usage_count`
+- **Memória multiusuário** — `Memory(user_id=..., namespace=...)` com isolamento por usuário, `remember/recall/forget/remember_many`, recall profundo (`depth="deep"`) e provedor externo `Mem0Memory`
+- **Enterprise leve** — Redação de PII (`redact_pii`), auditoria em JSONL com RBAC (`AuditLogger`, `Role`) e estimativa de custo/métricas Prometheus (`estimate_cost`, `CrewOutput.cost()`)
+
+### Funcionalidades consolidadas (desde v3.0)
+
+- **OpenRouter Native Support** — Roteamento dinâmico com fallback automático entre modelos
+- **Multi-Provider Interoperability** — Misture agentes de diferentes provedores (ex: Gemini + Llama) na mesma Crew
+- **ReAct Reasoning** — Loop Thought, Action, Observation com function calling nativo
+- **7 Provedores LLM** — Google Gemini, OpenAI GPT, Anthropic Claude, HuggingFace, OpenRouter, Ollama e servidores OpenAI-compatible
+- **4 Processos de Crew** — Sequential, Hierarchical, Parallel (asyncio), Consensual
+- **Tool System** — Decorator `@tool`, schemas Pydantic, JSON schema automático para LLM
+- **RAG Pipeline** — Document loaders, text splitters, embeddings, vector store, retriever
+- **Memória** — Curto prazo (sliding window), longo prazo (SQLite), entidades
+- **Guardrails** — Validação de tamanho, filtro de conteúdo, schema validation
+- **Observabilidade** — EventBus com mais de 20 tipos de evento, callbacks console/arquivo
+- **Workflow Engine** — Pipelines com stages sequenciais, paralelos e condicionais
+- **Cache e Retry** — Cache LRU + disco (SQLite), retry com backoff exponencial + fallback automático
+
+## Instalação
 
 ```bash
 pip install mangaba
@@ -59,7 +70,7 @@ pip install mangaba[all]
 pip install mangaba[dev]
 ```
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Agente simples com ferramenta
 
@@ -212,7 +223,7 @@ task = Task(
 )
 ```
 
-### Comunicação entre agentes (A2A Protocol — NOVO v3.3.0)
+### Comunicação entre agentes (protocolo A2A interno)
 
 ```python
 from protocols.a2a import A2AProtocol, A2AMessage
@@ -237,7 +248,7 @@ protocolo.broadcast(A2AMessage(
 ))
 ```
 
-### Vector store com ChromaDB (NOVO v3.3.0)
+### Vector store com ChromaDB
 
 ```python
 from mangaba.vectorstores import ChromaVectorStore, create_vectorstore
@@ -253,7 +264,7 @@ store.add(chunks)
 results = store.similarity_search("machine learning", k=5)
 ```
 
-## 🌊 Flows — orquestração orientada a eventos
+## Flows — orquestração orientada a eventos
 
 Crews coordenam agentes; Flows coordenam tudo o mais. Cada método reage ao
 resultado de outro, o estado é tipado, e o progresso pode ser persistido para
@@ -307,7 +318,7 @@ resultado = Triagem().resume("6f1c...")   # pula os passos já concluídos
 ramo = Triagem().fork("6f1c...")          # ramifica a partir do checkpoint
 ```
 
-## 📚 Knowledge — fundamentar respostas em documentos
+## Knowledge — fundamentar respostas em documentos
 
 Diferente da memória (o que o agente viveu), a Knowledge é o que ele pode
 consultar. Aceita PDF, DOCX, Excel, JSON, CSV, URL e diretórios inteiros.
@@ -334,7 +345,7 @@ agente = Agent(role="Auditor", goal="Verificar conformidade",
 Passe `knowledge=` para a `Crew` e todos os agentes que não têm base própria
 recebem a mesma.
 
-## 🧠 Memória com recall semântico
+## Memória com recall semântico
 
 A classe `Memory` pontua cada lembrança por similaridade, recência e
 importância — não só por parecido.
@@ -355,7 +366,22 @@ agente = Agent(role="Suporte", goal="Atender bem", backstory="...", memory=memor
 As classes antigas (`ShortTermMemory`, `LongTermMemory`, `EntityMemory`)
 continuam funcionando sem mudanças.
 
-## 👤 Human-in-the-loop
+Para produção multiusuário, isole por usuário e use recall profundo:
+
+```python
+from mangaba.memory import Memory
+from mangaba.memory.external import Mem0Memory
+
+memoria = Memory(embedding=embedding, user_id="cliente-123", namespace="suporte")
+memoria.remember("O cliente prefere respostas curtas")
+memoria.recall("preferências do cliente", depth="deep")
+
+# Memória externa (requer: pip install mem0ai)
+externa = Mem0Memory(config={"user_id": "cliente-123"})
+crew = Crew(agents=[...], tasks=[...], memory=externa)
+```
+
+## Human-in-the-loop
 
 `human_input=True` pausa de verdade: o revisor aprova, reescreve, ou devolve
 com notas — e as notas voltam para o agente corrigir.
@@ -380,7 +406,7 @@ task = Task(
 Sem handler, usa o terminal — e aprova sozinho quando não há terminal, para
 não travar execuções automatizadas.
 
-## 🤔 Reasoning, Planning e manager dedicado
+## Reasoning, Planning e manager dedicado
 
 ```python
 # O agente planeja e critica o próprio plano antes de agir
@@ -398,7 +424,7 @@ crew = Crew(
 )
 ```
 
-## 🛡️ Guardrails com juiz LLM
+## Guardrails com juiz LLM
 
 ```python
 from mangaba import LLMGuardrail, FunctionGuardrail
@@ -412,7 +438,7 @@ task = Task(
 )
 ```
 
-## 🖥️ CLI
+## CLI
 
 ```bash
 mangaba create crew pesquisa   # esqueleto com agents.yaml e tasks.yaml
@@ -424,9 +450,11 @@ mangaba train -n 5             # loop de feedback humano, salvo em pickle
 mangaba chat                   # REPL contra um agente
 mangaba config                 # mostra provedor/modelo (nunca a chave)
 mangaba reset-memories --all
+mangaba replay -t <task_id>    # re-executa a partir de uma tarefa
+mangaba install                # instala as dependências do projeto
 ```
 
-## 🔌 MCP — ferramentas de servidores externos
+## MCP — ferramentas de servidores externos
 
 ```python
 from mangaba import Agent, MCPClient
@@ -439,7 +467,7 @@ with MCPClient(command=["npx", "-y", "@modelcontextprotocol/server-filesystem", 
 Funciona por stdio ou HTTP, com o SDK oficial `mcp` quando disponível e um
 transporte próprio sem dependências como fallback.
 
-## 🤝 A2A — interoperar com agentes de outros frameworks
+## A2A — interoperar com agentes de outros frameworks
 
 O protocolo aberto Agent2Agent. Não confundir com `protocols/a2a.py`, que é o
 barramento interno de mensagens entre agentes do próprio processo.
@@ -459,25 +487,25 @@ meu_agente = Agent(role="Coordenador", goal="...", backstory="...",
 ```
 
 O card é servido em `/.well-known/agent.json`; as tarefas transitam por
-`submitted → working → completed | failed`.
+`submitted`, `working`, `completed` ou `failed`.
 
-## 🧰 Ferramentas incluídas
+## Ferramentas incluídas
 
 | Ferramenta | O que faz |
 |---|---|
 | `ScrapeWebsiteTool` | Baixa uma página e extrai o texto legível |
 | `HTTPRequestTool` | Chamada REST genérica |
-| `DocumentSearchTool` | Busca semântica *dentro* de um arquivo (PDF, DOCX, Excel…) |
+| `DocumentSearchTool` | Busca semântica dentro de um arquivo (PDF, DOCX, Excel) |
 | `FileSearchTool` | Busca literal ou regex numa árvore de diretórios |
 | `SQLQueryTool` | SQL somente leitura em SQLite ou PostgreSQL |
-| `CodeInterpreterTool` | Executa Python — **desligado por padrão** |
+| `CodeInterpreterTool` | Executa Python — desligado por padrão |
 | `MCPClient.get_tools()` | Ferramentas vindas de servidores MCP externos |
 | `A2AClient.as_tool()` | Um agente remoto como ferramenta local |
 
 Resolva qualquer uma pelo nome curto no YAML (`http_request`, `sql_query`, …)
 ou via `ToolRegistry`.
 
-### ⚠️ Antes de usar em produção
+### Antes de usar em produção
 
 - **`CodeInterpreterTool` executa código escrito pelo modelo.** Exige
   `enabled=True`; usa Docker isolado quando disponível. `unsafe_mode=True`
@@ -499,7 +527,7 @@ ou via `ToolRegistry`.
 - **`FileSearchTool`** sem `root_dir` lê qualquer coisa que o processo possa
   ler. Sempre passe `root_dir` quando o caminho puder vir do modelo.
 
-## 📊 Observabilidade
+## Observabilidade
 
 ```python
 from mangaba import auto_configure_from_env, OpenTelemetryCallback, configure_observability
@@ -512,21 +540,37 @@ Integra com OpenTelemetry (OTLP), Langfuse, MLflow e Arize Phoenix. Cada
 execução recebe um `trace_id` que sobrevive inclusive às threads de tarefas
 paralelas, então a crew inteira aparece como um trace só.
 
-## 🗄️ Vector Stores
+Recursos adicionais para produção:
+
+```python
+from mangaba import redact_pii, AuditLogger, AuditCallback, estimate_cost
+
+limpo = redact_pii("contato joao@empresa.com, CPF 123.456.789-00")
+
+logger = AuditLogger(path=".mangaba/audit.jsonl", actor="api")
+configure_observability(AuditCallback(logger))
+
+custo_usd = estimate_cost(result.token_usage, model="gpt-4o-mini")
+print(result.cost("gpt-4o-mini"))   # estimativa direto no CrewOutput
+print(result.prometheus())          # métricas em formato Prometheus
+```
+
+## Vector Stores
 
 | Store | Persistência | Ideal para |
 |---|---|---|
-| **InMemoryVectorStore** | Volátil (RAM) | Testes e protótipos |
-| **ChromaVectorStore** | Disco (ChromaDB) | Aplicações standalone |
-| **PostgresVectorStore** | PostgreSQL + pgvector | Produção, dados relacionais |
-| **RedisVectorStore** | Redis + RediSearch | Alta performance, caching |
-| **SQLiteVectorStore** | SQLite local | Embeddings simples, sem infra |
+| `InMemoryVectorStore` | Volátil (RAM) | Testes e protótipos |
+| `ChromaVectorStore` | Disco (ChromaDB) | Aplicações standalone |
+| `PostgresVectorStore` | PostgreSQL + pgvector | Produção, dados relacionais |
+| `RedisVectorStore` | Redis + RediSearch | Alta performance, caching |
+| `SQLiteVectorStore` | SQLite local | Embeddings simples, sem infra |
 
 Todas implementam `BaseVectorStore` e são intercambiáveis via `create_vectorstore()`.
 
-## 🤝 Protocolos de Comunicação
+## Protocolos de Comunicação
 
 ### A2A (Agent-to-Agent)
+
 Mensageria direta entre agentes com suporte a request/response e broadcast:
 
 ```python
@@ -537,6 +581,7 @@ protocol.send(A2AMessage(sender="agent_a", recipient="agent_b", content="..."))
 ```
 
 ### MCP (Multi-Context Protocol)
+
 Compartilhamento de contexto hierárquico entre agentes com prioridade, tags e busca por relevância:
 
 ```python
@@ -548,7 +593,7 @@ mcp.share_context("sessao_1", ctx)
 resultados = mcp.query_context("sessao_1", "vulnerabilidade")
 ```
 
-## 🧩 Prompt Templates
+## Prompt Templates
 
 ```python
 from mangaba.core.llm.prompt_templates import PromptTemplate, ChatPromptTemplate, SystemPromptBuilder
@@ -572,45 +617,45 @@ builder.add_instruction("Responda em markdown")
 prompt = builder.build()
 ```
 
-## 🏛️ Padrões de Projeto
+## Padrões de Projeto
 
 O Mangaba aplica padrões GoF de forma consistente em toda a base de código:
 
 | Padrão | Onde é usado |
 |---|---|
-| **Factory** | `create_llm_client()` / `create_vectorstore()` — instancia provedores por nome |
-| **Abstract Factory** | `BaseLLMProvider` / `BaseVectorStore` — interface comum; cada provider é uma família concreta |
-| **Facade** | `LLMClient` — esconde a complexidade dos provedores atrás de uma API uniforme |
-| **Decorator** | `@tool` — converte funções Python em `BaseTool` com schema automático |
-| **Composite** | `Crew` / `Toolkit` — agrega múltiplos agentes/tarefas/ferramentas como unidade |
-| **Strategy** | `Process` (sequential/hierarchical/parallel/consensual); providers como strategies |
-| **Observer** | `EventBus` + callbacks (`ConsoleCallback`, `FileCallback`) |
-| **Template Method** | `BaseLLMProvider.generate/stream/generate_with_tools` — subclasses implementam os passos |
-| **Chain of Responsibility** | `GuardrailChain` — passa o output por validadores em sequência |
-| **Command** | `Task` — encapsula instrução, agente e ferramentas |
-| **Iterator** | `stream()` — retorna `Iterator[str]` token a token |
-| **Pipes & Filters** | `Pipeline → Stage[] → ParallelStage / ConditionalStage` |
-| **Builder** | `SystemPromptBuilder` — constrói system prompts passo a passo |
-| **Singleton** | `EventBus` — instância única de barramento de eventos |
+| Factory | `create_llm_client()` / `create_vectorstore()` — instancia provedores por nome |
+| Abstract Factory | `BaseLLMProvider` / `BaseVectorStore` — interface comum; cada provider é uma família concreta |
+| Facade | `LLMClient` — esconde a complexidade dos provedores atrás de uma API uniforme |
+| Decorator | `@tool` — converte funções Python em `BaseTool` com schema automático |
+| Composite | `Crew` / `Toolkit` — agrega múltiplos agentes/tarefas/ferramentas como unidade |
+| Strategy | `Process` (sequential/hierarchical/parallel/consensual); providers como strategies |
+| Observer | `EventBus` + callbacks (`ConsoleCallback`, `FileCallback`) |
+| Template Method | `BaseLLMProvider.generate/stream/generate_with_tools` — subclasses implementam os passos |
+| Chain of Responsibility | `GuardrailChain` — passa o output por validadores em sequência |
+| Command | `Task` — encapsula instrução, agente e ferramentas |
+| Iterator | `stream()` — retorna `Iterator[str]` token a token |
+| Pipes e Filters | `Pipeline` com `Stage`, `ParallelStage` e `ConditionalStage` |
+| Builder | `SystemPromptBuilder` — constrói system prompts passo a passo |
+| Singleton | `EventBus` — instância única de barramento de eventos |
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 ```
 mangaba/
-├── core/                   # Cérebro do framework
+├── core/                   # Núcleo do framework
 │   ├── agent.py                # Agent com ReAct reasoning
 │   ├── task.py                 # Tasks com guardrails e retry
 │   ├── crew.py                 # Orquestração (4 processos)
 │   ├── workflow.py             # Pipeline engine
-│   ├── reasoning.py            # ReAct loop (Think→Act→Observe)
+│   ├── reasoning.py            # ReAct loop (Think, Act, Observe)
 │   ├── planner.py              # Decomposição automática de tarefas
 │   ├── guardrails.py           # LengthGuardrail, ContentFilter, Schema
 │   ├── output_parsers.py       # JSON, Pydantic, List, Markdown
 │   ├── types.py                # Tipos Pydantic v2 (LLMConfig, AgentState...)
-│   ├── exceptions.py           # Hierarquia de 19+ exceções
-│   ├── events.py               # EventBus (22+ event types)
+│   ├── exceptions.py           # Hierarquia de exceções
+│   ├── events.py               # EventBus (tipos de evento)
 │   └── llm/                    # Engine LLM multi-provider
-│       ├── client.py               # 5 providers + OpenRouter + fallback
+│       ├── client.py               # Providers + OpenRouter + fallback
 │       ├── retry.py                # Retry com backoff exponencial
 │       ├── cache.py                # LRU (memória) + SQLite (disco)
 │       ├── token_counter.py        # TokenCounter + UsageTracker
@@ -628,7 +673,8 @@ mangaba/
 │   ├── short_term.py           # Sliding window (deque)
 │   ├── long_term.py            # SQLite + embeddings opcionais
 │   ├── entity.py               # Memória de entidades
-│   └── unified.py              # Memory: recall composto + consolidação
+│   ├── unified.py              # Memory: recall composto + consolidação
+│   └── external.py             # Mem0Memory: provedor externo de memória
 ├── embeddings/             # Provedores de embedding
 │   ├── base.py                 # BaseEmbedding ABC
 │   ├── openai_embed.py         # text-embedding-3-small
@@ -656,16 +702,19 @@ mangaba/
 ├── knowledge/              # Base de conhecimento (RAG de documentos)
 │   ├── knowledge.py            # Knowledge: ingestão, query, threshold
 │   └── sources.py              # PDF, DOCX, Excel, JSON, CSV, URL, diretório
-├── observability/          # Tracing externo
+├── observability/          # Tracing externo e governança
 │   ├── otel.py                 # OpenTelemetry (OTLP)
 │   ├── langfuse.py             # Langfuse
 │   ├── mlflow.py               # MLflow
-│   └── phoenix.py              # Arize Phoenix
+│   ├── phoenix.py              # Arize Phoenix
+│   ├── pii.py                  # Redação de PII
+│   ├── audit.py                # Auditoria JSONL + RBAC
+│   └── metrics.py              # Custo estimado + Prometheus
 ├── training/               # Treino e avaliação
 │   ├── trainer.py              # mangaba train — feedback humano iterativo
 │   └── evaluator.py            # mangaba test — nota 1–10 por tarefa
 ├── cli/                    # Interface de linha de comando
-│   ├── main.py                 # create/run/test/train/chat/config/reset
+│   ├── main.py                 # create/run/test/train/chat/config/reset/replay/install
 │   └── templates/              # Esqueletos de projeto gerados
 ├── callbacks/              # Observabilidade local
 │   ├── console.py              # Print formatado de eventos
@@ -714,28 +763,28 @@ examples/                  # Exemplos práticos
 └── ...
 ```
 
-## 🔄 Processos de Crew
+## Processos de Crew
 
 | Processo | Descrição | Uso |
 |---|---|---|
 | `SEQUENTIAL` | Tarefas executadas em ordem, uma após a outra | Workflows lineares |
-| `HIERARCHICAL` | Primeiro agente é manager, delega e revisa | Equipes com líder |
+| `HIERARCHICAL` | Manager delega e revisa cada entrega | Equipes com líder |
 | `PARALLEL` | Tarefas executadas concorrentemente (asyncio) | Tarefas independentes |
 | `CONSENSUAL` | Todos os agentes executam cada tarefa, resultado sintetizado | Decisões críticas |
 
-## 🌐 Provedores LLM
+## Provedores LLM
 
-| Provedor | Function Calling | Streaming | Modelo Padrão |
+| Provedor | Function Calling | Streaming | Modelo padrão |
 |---|---|---|---|
-| **OpenRouter** | ✅ Nativo + Fallback | ✅ | Multi-model routing |
-| **Google Gemini** | ✅ Nativo | ✅ | `gemini-2.5-flash` |
-| **OpenAI** | ✅ Nativo | ✅ | `gpt-4o-mini` |
-| **Anthropic** | ✅ Nativo (tool_use) | ✅ | `claude-3-haiku-20240307` |
-| **HuggingFace** | ✅ Nativo (11 modelos) / ⚠️ Prompt (14 modelos) | ✅ via `chat_completion` | `mistralai/Mistral-7B-Instruct-v0.3` |
-| **Ollama** | ✅ Nativo + fallback por prompt | ✅ | roda 100% local, sem API key |
-| **OpenAI-compatible** | ✅ Nativo | ✅ | vLLM, LM Studio, llama.cpp, LocalAI |
+| OpenRouter | Nativo + fallback | Sim | Roteamento multi-modelo |
+| Google Gemini | Nativo | Sim | `gemini-2.5-flash` |
+| OpenAI | Nativo | Sim | `gpt-4o-mini` |
+| Anthropic | Nativo (tool_use) | Sim | `claude-3-haiku-20240307` |
+| HuggingFace | Nativo (11 modelos) / via prompt (14 modelos) | Sim, via `chat_completion` | `mistralai/Mistral-7B-Instruct-v0.3` |
+| Ollama | Nativo + fallback por prompt | Sim | Roda 100% local, sem API key |
+| OpenAI-compatible | Nativo | Sim | vLLM, LM Studio, llama.cpp, LocalAI |
 
-### 🏠 Modelos locais
+### Modelos locais
 
 Nem Ollama nem os servidores OpenAI-compatible exigem API key:
 
@@ -757,11 +806,11 @@ GOOGLE_API_KEY=sua_chave
 # ou OPENAI_API_KEY, ANTHROPIC_API_KEY, HUGGINGFACE_API_KEY, OPENROUTER_API_KEY
 ```
 
-### 🤗 Modelos Open-Source HuggingFace
+### Modelos open-source (HuggingFace)
 
-O provider HuggingFace usa `chat_completion` (OpenAI-compatible) com **detecção automática de tool calling**: modelos que suportam function calling nativo recebem `tools=[...]` direto na API; os demais usam prompt injection como fallback. Use `hf_model_supports_tools(model_id)` para verificar.
+O provider HuggingFace usa `chat_completion` (OpenAI-compatible) com detecção automática de tool calling: modelos com function calling nativo recebem `tools=[...]` direto na API; os demais usam prompt injection como fallback. Use `hf_model_supports_tools(model_id)` para verificar.
 
-O Mangaba inclui um catálogo de **28 modelos open-source** disponíveis via HuggingFace Inference API, organizados por categoria:
+O Mangaba inclui um catálogo de 28 modelos open-source disponíveis via HuggingFace Inference API, organizados por categoria:
 
 ```python
 from mangaba import list_huggingface_models, HF_OPEN_MODELS
@@ -781,10 +830,10 @@ HuggingFaceLLMProvider.list_models(category="general")
 
 | Categoria | Modelos incluídos |
 |---|---|
-| **general** (19) | Mistral 7B/Mixtral 8x7B/8x22B, Llama 3/3.1/3.2, Qwen 2.5, Phi-3/3.5, Gemma 2 |
-| **code** (4) | StarCoder2 15B, Qwen 2.5 Coder 7B/32B, DeepSeek Coder 33B |
-| **reasoning** (2) | DeepSeek R1 Distill Qwen 7B, DeepSeek R1 Distill Llama 70B |
-| **embedding** (3) | BGE-M3, all-MiniLM-L6-v2, Multilingual E5 Large |
+| general (19) | Mistral 7B/Mixtral 8x7B/8x22B, Llama 3/3.1/3.2, Qwen 2.5, Phi-3/3.5, Gemma 2 |
+| code (4) | StarCoder2 15B, Qwen 2.5 Coder 7B/32B, DeepSeek Coder 33B |
+| reasoning (2) | DeepSeek R1 Distill Qwen 7B, DeepSeek R1 Distill Llama 70B |
+| embedding (3) | BGE-M3, all-MiniLM-L6-v2, Multilingual E5 Large |
 
 ```python
 from mangaba import hf_model_supports_tools
@@ -793,9 +842,10 @@ hf_model_supports_tools("mistralai/Mistral-7B-Instruct-v0.3")  # True  — nativ
 hf_model_supports_tools("google/gemma-2-9b-it")                # False — prompt injection
 ```
 
-## 📦 Dependências
+## Dependências
 
-**Core:**
+Núcleo:
+
 - `pydantic>=2.0.0` — Validação de tipos
 - `google-generativeai>=0.3.0` — Google Gemini
 - `openai>=1.6.0` — OpenAI GPT
@@ -805,7 +855,8 @@ hf_model_supports_tools("google/gemma-2-9b-it")                # False — promp
 - `requests>=2.25.0` — HTTP client
 - `loguru>=0.6.0` — Logging
 
-**Opcionais:**
+Opcionais:
+
 - `numpy>=1.24.0` — RAG e embeddings (`pip install mangaba[rag]`)
 - `sentence-transformers>=2.2.0` — Embeddings HF (`pip install mangaba[embeddings]`)
 - `duckduckgo-search>=3.9.0` — Busca web (`pip install mangaba[tools]`)
@@ -821,7 +872,7 @@ hf_model_supports_tools("google/gemma-2-9b-it")                # False — promp
 Modelos locais (Ollama, vLLM, LM Studio, llama.cpp, LocalAI) não precisam de
 nenhum extra — usam o cliente `openai`, que já é dependência do núcleo.
 
-## 🧪 Testes
+## Testes
 
 ```bash
 # Todos os testes
@@ -837,22 +888,18 @@ python -m pytest tests/ --cov=mangaba --cov-report=term-missing
 ### Testes contra modelo real
 
 `tests/test_gateway_integration.py` aponta o framework para o
-[Mangaba Gateway](https://mangaba.ngrok.app) — modelos GGUF locais de verdade —
-em vez de stubs. Cobre agente, crew, knowledge com embeddings reais, memória,
-guardrail com juiz LLM, revisão humana e propagação de trace.
+Mangaba Gateway — modelos GGUF locais de verdade — em vez de stubs. Cobre
+agente, crew, knowledge com embeddings reais, memória, guardrail com juiz LLM,
+revisão humana e propagação de trace.
 
 ```bash
 python -m pytest tests/test_gateway_integration.py -v
 ```
 
 O arquivo inteiro é pulado automaticamente quando o gateway está fora do ar,
-então rodar offline continua verde. Entre esses testes há um guarda de
-regressão para um bug que existia até a v4.0.0: um agente sem ferramentas
-descartava o system prompt, então nada de papel, memória ou conhecimento
-chegava ao modelo. O teste dá ao agente uma regra que só existe no backstory e
-verifica se o modelo a obedece.
+então rodar offline continua verde.
 
-## 🤝 Contribuição
+## Contribuição
 
 1. Fork o projeto
 2. Crie sua branch (`git checkout -b feature/nova-feature`)
@@ -860,8 +907,6 @@ verifica se o modelo a obedece.
 4. Push (`git push origin feature/nova-feature`)
 5. Abra um Pull Request
 
-## 📄 Licença
+## Licença
 
 MIT License
-
----
