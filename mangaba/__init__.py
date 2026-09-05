@@ -99,6 +99,8 @@ from mangaba.knowledge import (
     ExcelKnowledgeSource,
     JSONKnowledgeSource,
     Knowledge,
+    KnowledgeConfig,
+    MarkdownKnowledgeSource,
     PDFKnowledgeSource,
     StringKnowledgeSource,
     TextFileKnowledgeSource,
@@ -107,9 +109,11 @@ from mangaba.knowledge import (
 
 # ── Memory ─────────────────────────────────────────────────────────────
 from mangaba.memory import (
+    BaseExternalMemory,
     EntityMemory,
     InMemoryBackend,
     LongTermMemory,
+    Mem0Memory,
     Memory,
     MemoryScope,
     MemoryWeights,
@@ -119,12 +123,20 @@ from mangaba.memory import (
 
 # ── Observability ──────────────────────────────────────────────────────
 from mangaba.observability import (
+    AuditCallback,
+    AuditLogger,
     LangfuseCallback,
     MLflowCallback,
     OpenTelemetryCallback,
     PhoenixCallback,
+    Role,
     auto_configure_from_env,
     configure_observability,
+    contains_pii,
+    estimate_cost,
+    prometheus_text,
+    redact_pii,
+    require_role,
 )
 
 # ── Training & evaluation ──────────────────────────────────────────────
@@ -219,9 +231,11 @@ __all__ = [
     "HumanFeedback",
     # Knowledge
     "Knowledge",
+    "KnowledgeConfig",
     "BaseKnowledgeSource",
     "StringKnowledgeSource",
     "TextFileKnowledgeSource",
+    "MarkdownKnowledgeSource",
     "PDFKnowledgeSource",
     "DOCXKnowledgeSource",
     "CSVKnowledgeSource",
@@ -235,6 +249,8 @@ __all__ = [
     "MemoryWeights",
     "InMemoryBackend",
     "SQLiteBackend",
+    "BaseExternalMemory",
+    "Mem0Memory",
     "ShortTermMemory",
     "LongTermMemory",
     "EntityMemory",
@@ -243,6 +259,14 @@ __all__ = [
     "LangfuseCallback",
     "MLflowCallback",
     "PhoenixCallback",
+    "redact_pii",
+    "contains_pii",
+    "AuditLogger",
+    "AuditCallback",
+    "Role",
+    "require_role",
+    "estimate_cost",
+    "prometheus_text",
     "configure_observability",
     "auto_configure_from_env",
     # Training

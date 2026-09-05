@@ -14,6 +14,12 @@ from mangaba.memory.unified import (
     StorageBackend,
 )
 
+try:
+    from mangaba.memory.external import BaseExternalMemory, Mem0Memory
+except Exception:  # pragma: no cover - never break the base import
+    BaseExternalMemory = object  # type: ignore
+    Mem0Memory = None  # type: ignore
+
 __all__ = [
     "BaseMemory",
     "ShortTermMemory",
@@ -26,4 +32,6 @@ __all__ = [
     "StorageBackend",
     "InMemoryBackend",
     "SQLiteBackend",
+    "BaseExternalMemory",
+    "Mem0Memory",
 ]

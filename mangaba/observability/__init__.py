@@ -52,6 +52,9 @@ from mangaba.observability.langfuse import LangfuseCallback
 from mangaba.observability.mlflow import MLflowCallback
 from mangaba.observability.otel import OpenTelemetryCallback
 from mangaba.observability.phoenix import PhoenixCallback
+from mangaba.observability.pii import contains_pii, redact_pii
+from mangaba.observability.audit import AuditCallback, AuditLogger, Role, require_role
+from mangaba.observability.metrics import estimate_cost, prometheus_text
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +68,14 @@ __all__ = [
     "LangfuseCallback",
     "MLflowCallback",
     "PhoenixCallback",
+    "redact_pii",
+    "contains_pii",
+    "AuditLogger",
+    "AuditCallback",
+    "Role",
+    "require_role",
+    "estimate_cost",
+    "prometheus_text",
     "configure_observability",
     "auto_configure_from_env",
     "flush_observability",

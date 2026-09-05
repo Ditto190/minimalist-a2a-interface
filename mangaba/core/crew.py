@@ -35,11 +35,15 @@ class CrewOutput:
         process: Process,
         duration: float,
         crew_id: str,
+        token_usage: Optional[Dict[str, Any]] = None,
+        usage_metrics: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.tasks_outputs = tasks_outputs
         self.process = process
         self.duration = duration
         self.crew_id = crew_id
+        self.token_usage: Dict[str, Any] = token_usage or {"total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        self.usage_metrics: Dict[str, Any] = usage_metrics or dict(self.token_usage)
         from datetime import datetime
         self.timestamp = datetime.now().isoformat()
 
@@ -48,6 +52,51 @@ class CrewOutput:
         if self.tasks_outputs:
             return self.tasks_outputs[-1].result
         return ""
+
+    @property
+    def raw(self) -> str:
+        """CrewAI-compatible alias for the final string output."""
+        return self.final_output
+
+    def cost(self, model: str = "default") -> float:
+        """Estimated USD cost for this run (offline price table)."""
+        try:
+            from mangaba.observability.metrics import estimate_cost
+            return estimate_cost(self.token_usage, model=model)
+        except Exception:
+            return 0.0
+
+    def prometheus(self, model: str = "default") -> str:
+        """Prometheus exposition text for this run."""
+        try:
+            from mangaba.observability.metrics import estimate_cost, prometheus_text
+            return prometheus_text(self.crew_id, self.token_usage, cost_usd=estimate_cost(self.token_usage, model=model), duration_s=self.duration)
+        except Exception:
+            return ""
+
+    @property
+    def pydantic(self) -> Optional[Any]:
+        if self.tasks_outputs:
+            return getattr(self.tasks_outputs[-1], "pydantic", None)
+        return None
+
+    @property
+    def json_dict(self) -> Optional[Dict[str, Any]]:
+        if self.tasks_outputs:
+            return getattr(self.tasks_outputs[-1], "json_dict", None)
+        return None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "crew_id": self.crew_id,
+            "process": self.process.value,
+            "duration": self.duration,
+            "final_output": self.final_output,
+            "tasks_outputs": [t.to_dict() if hasattr(t, "to_dict") else str(t) for t in self.tasks_outputs],
+            "token_usage": self.token_usage,
+            "usage_metrics": self.usage_metrics,
+            "timestamp": self.timestamp,
+        }
 
     def __str__(self) -> str:
         return self.final_output
@@ -93,6 +142,17 @@ class Crew:
         manager_agent: Optional[Agent] = None,
         manager_llm: Optional[Any] = None,
         knowledge: Optional[Any] = None,
+        # ── CrewAI-parity ──
+        function_calling_llm: Optional[Any] = None,
+        output_log_file: Optional[Any] = None,
+        stream: bool = False,
+        tracing: Optional[bool] = None,
+        cache: bool = True,
+        embedder: Optional[Any] = None,
+        share_crew: bool = False,
+        before_kickoff_callbacks: Optional[List[Any]] = None,
+        after_kickoff_callbacks: Optional[List[Any]] = None,
+        memory_config: Optional[Dict[str, Any]] = None,
     ) -> None:
         if not agents:
             raise CrewError("Crew must have at least one agent")
@@ -107,6 +167,22 @@ class Crew:
         self.max_rpm = max_rpm
         self.memory = memory
         self.knowledge = knowledge
+        self.function_calling_llm = function_calling_llm
+        self.output_log_file = output_log_file
+        self.stream = stream
+        self.tracing = tracing
+        self.cache = cache
+        self.embedder = embedder
+        self.share_crew = share_crew
+        self.before_kickoff_callbacks: List[Any] = list(before_kickoff_callbacks or [])
+        self.after_kickoff_callbacks: List[Any] = list(after_kickoff_callbacks or [])
+        self.memory_config: Dict[str, Any] = dict(memory_config or {})
+        self.usage_metrics: Dict[str, Any] = {"total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        self._last_inputs: Optional[Dict[str, Any]] = None
+        # memory=True builds a default Memory (CrewAI-parity); a dict
+        # memory_config with provider/user_id selects the backend.
+        if self.memory is True:
+            self.memory = self._build_default_memory()
 
         # Pre-execution planning
         self.planning = planning
@@ -133,12 +209,69 @@ class Crew:
         callback can stitch the whole crew together even when tasks run on
         separate threads.
         """
+        inputs = self._run_callbacks(self.before_kickoff_callbacks, inputs or {})
         with start_trace() as trace_id:
             self.trace_id = trace_id
-            return self._execute_run(inputs)
+            result = self._execute_run(inputs)
+        result = self._run_output_callbacks(self.after_kickoff_callbacks, result)
+        self._write_output_log(result)
+        return result
+
+    async def akickoff(self, inputs: Optional[Dict[str, Any]] = None) -> CrewOutput:
+        """Native async kickoff (CrewAI-parity). Runs blocking work in threads."""
+        inputs = self._run_callbacks(self.before_kickoff_callbacks, inputs or {})
+        with start_trace() as trace_id:
+            self.trace_id = trace_id
+            result = await asyncio.to_thread(self._execute_run, inputs)
+        result = self._run_output_callbacks(self.after_kickoff_callbacks, result)
+        self._write_output_log(result)
+        return result
+
+    def kickoff_for_each(self, inputs_list: List[Dict[str, Any]]) -> List[CrewOutput]:
+        """Run the crew once per input dict (CrewAI-parity)."""
+        return [self.kickoff(inputs) for inputs in inputs_list or [{}]]
+
+    async def akickoff_for_each(self, inputs_list: List[Dict[str, Any]]) -> List[CrewOutput]:
+        """Async version of :meth:`kickoff_for_each`."""
+        results: List[CrewOutput] = []
+        for inputs in inputs_list or [{}]:
+            results.append(await self.akickoff(inputs))
+        return results
+
+    def replay(self, task_id: str, inputs: Optional[Dict[str, Any]] = None) -> CrewOutput:
+        """Re-run from a specific task, reusing outputs of completed tasks."""
+        start_idx = 0
+        for i, task in enumerate(self.tasks):
+            if task.task_id == task_id:
+                start_idx = i
+                break
+        else:
+            raise CrewError(f"No task with id '{task_id}' in this crew")
+        # Replay = sequential run starting at start_idx
+        saved = [t.output for t in self.tasks[:start_idx]]
+        outputs: List[TaskOutput] = [o for o in saved if o is not None]
+        for task in self.tasks[start_idx:]:
+            outputs.append(task.execute(inputs or self._last_inputs or {}))
+        import time as _time
+        result = CrewOutput(tasks_outputs=outputs, process=self.process, duration=0.0, crew_id=self.crew_id)
+        self._write_output_log(result)
+        return result
+
+    def train(self, iterations: int = 3, inputs: Optional[Dict[str, Any]] = None, filename: Optional[str] = None) -> Any:
+        """Train the crew with human feedback (CrewAI-parity wrapper)."""
+        from mangaba.training import CrewTrainer
+        trainer = CrewTrainer(self, iterations=iterations, inputs=inputs or {}, filename=filename or "trained_agents_data.pkl", verbose=self.verbose)
+        return trainer.train()
+
+    def test(self, iterations: int = 2, inputs: Optional[Dict[str, Any]] = None) -> Any:
+        """Evaluate the crew with the LLM-as-judge evaluator."""
+        from mangaba.training import CrewEvaluator
+        evaluator = CrewEvaluator(self, iterations=iterations, inputs=inputs or {}, verbose=self.verbose)
+        return evaluator.evaluate()
 
     def _execute_run(self, inputs: Optional[Dict[str, Any]] = None) -> CrewOutput:
         start = time.monotonic()
+        self._last_inputs = dict(inputs or {})
 
         EventBus.emit(Event(
             event_type=EventType.CREW_START,
@@ -164,7 +297,9 @@ class Crew:
                 raise CrewError(f"Unknown process: {self.process}")
 
             duration = time.monotonic() - start
-            result = CrewOutput(tasks_outputs=outputs, process=self.process, duration=duration, crew_id=self.crew_id)
+            token_usage = self._aggregate_token_usage()
+            result = CrewOutput(tasks_outputs=outputs, process=self.process, duration=duration, crew_id=self.crew_id, token_usage=token_usage, usage_metrics=dict(token_usage))
+            self.usage_metrics = dict(token_usage)
 
             EventBus.emit(Event(
                 event_type=EventType.CREW_END,
@@ -443,6 +578,85 @@ class Crew:
         for i, a1 in enumerate(roster):
             for a2 in roster[i + 1 :]:
                 a1.connect_to(a2)
+
+    # ── CrewAI-parity helpers ────────────────────────────────────────
+
+    def _run_callbacks(self, callbacks: List[Any], inputs: Dict[str, Any]) -> Dict[str, Any]:
+        data = dict(inputs or {})
+        for cb in callbacks:
+            try:
+                out = cb(data)
+                if isinstance(out, dict):
+                    data = out
+            except Exception as exc:
+                log.warning("before_kickoff callback failed: %s", exc)
+        return data
+
+    def _run_output_callbacks(self, callbacks: List[Any], result: CrewOutput) -> CrewOutput:
+        for cb in callbacks:
+            try:
+                out = cb(result)
+                if isinstance(out, CrewOutput):
+                    result = out
+            except Exception as exc:
+                log.warning("after_kickoff callback failed: %s", exc)
+        return result
+
+    def _write_output_log(self, result: CrewOutput) -> None:
+        if not self.output_log_file:
+            return
+        try:
+            path = self.output_log_file if isinstance(self.output_log_file, str) else "crew_output.txt"
+            if path is True:
+                path = "crew_output.txt"
+            import os
+            directory = os.path.dirname(str(path))
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            with open(str(path), "w", encoding="utf-8") as f:
+                f.write(result.final_output)
+        except Exception as exc:
+            log.warning("Could not write output_log_file: %s", exc)
+
+    def _aggregate_token_usage(self) -> Dict[str, Any]:
+        total = {"total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        for agent in self.agents:
+            llm = getattr(agent, "llm", None)
+            usage = getattr(llm, "total_usage", None) if llm is not None else None
+            if usage is not None:
+                try:
+                    d = usage if isinstance(usage, dict) else usage.model_dump() if hasattr(usage, "model_dump") else {}
+                    for k in total:
+                        total[k] += int(d.get(k, 0) or 0)
+                except Exception:
+                    continue
+        return total
+
+    def _build_default_memory(self) -> Any:
+        """Create a Memory from ``memory_config`` (provider/user_id/embedder)."""
+        provider = self.memory_config.get("provider")
+        # An already-built memory instance (incl. external) passes through.
+        if provider is not None and not isinstance(provider, (str, dict)):
+            return provider
+        try:
+            from mangaba.memory import Memory
+        except Exception:
+            return True
+        kwargs: Dict[str, Any] = {}
+        for key in ("user_id", "namespace", "db_path", "embedder", "embedding", "weights", "half_life_hours", "recency_half_life_days"):
+            if key in self.memory_config:
+                kwargs[key] = self.memory_config[key]
+        if self.embedder is not None and "embedder" not in kwargs and "embedding" not in kwargs:
+            kwargs["embedder"] = self.embedder
+        # External provider by name: {"provider": "mem0", "config": {...}}
+        if isinstance(provider, str) and provider.lower() in ("mem0", "external"):
+            try:
+                from mangaba.memory.external import Mem0Memory
+                cfg = self.memory_config.get("config", {})
+                return Mem0Memory(config=cfg)
+            except Exception as exc:
+                log.warning("Could not build Mem0 memory (%s) — using local Memory", exc)
+        return Memory(**kwargs)
 
     def __repr__(self) -> str:
         return f"Crew(agents={len(self.agents)}, tasks={len(self.tasks)}, process={self.process.value})"

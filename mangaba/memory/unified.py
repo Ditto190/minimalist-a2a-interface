@@ -531,6 +531,18 @@ class Memory(BaseMemory):
         dedup_threshold: float = 0.85,
         async_writes: bool = True,
         max_entries: int = 0,
+        # ── CrewAI-parity (Fase 2) ──
+        embedder: Optional[Any] = None,
+        user_id: Optional[str] = None,
+        namespace: Optional[str] = None,
+        recency_half_life_days: Optional[float] = None,
+        consolidation_threshold: Optional[float] = None,
+        consolidation_limit: int = 5,
+        default_importance: float = 0.5,
+        batch_dedup_threshold: float = 0.98,
+        confidence_threshold_high: float = 0.8,
+        confidence_threshold_low: float = 0.5,
+        query_analysis_threshold: int = 200,
     ) -> None:
         if storage is not None:
             self.storage: StorageBackend = storage
@@ -539,12 +551,23 @@ class Memory(BaseMemory):
         else:
             self.storage = InMemoryBackend()
 
-        self.embedding = embedding
+        self.embedding = embedding if embedding is not None else embedder
         self.llm = llm
         self.weights = (weights or MemoryWeights()).normalized()
+        if recency_half_life_days is not None:
+            half_life_hours = float(recency_half_life_days) * 24.0
         self.half_life_hours = max(1e-6, float(half_life_hours))
         self.default_scope = _coerce_scope(default_scope)
-        self.dedup_threshold = float(dedup_threshold)
+        self.dedup_threshold = float(consolidation_threshold if consolidation_threshold is not None else dedup_threshold)
+        self.consolidation_threshold = self.dedup_threshold
+        self.consolidation_limit = int(consolidation_limit)
+        self.default_importance = float(default_importance)
+        self.batch_dedup_threshold = float(batch_dedup_threshold)
+        self.confidence_threshold_high = float(confidence_threshold_high)
+        self.confidence_threshold_low = float(confidence_threshold_low)
+        self.query_analysis_threshold = int(query_analysis_threshold)
+        self.user_id = user_id
+        self.namespace = namespace
         self.async_writes = bool(async_writes)
         self.max_entries = int(max_entries)
 
@@ -582,7 +605,14 @@ class Memory(BaseMemory):
         entities = list(meta.pop("entities", None) or EntityMemory._extract_entities(text))
 
         raw_importance = meta.pop("importance", None)
+        if raw_importance is None:
+            raw_importance = self.default_importance if self.default_importance != 0.5 else None
         importance = self._coerce_importance(raw_importance, text)
+        # Multi-user isolation (CrewAI-parity): entries carry user_id/namespace.
+        # Explicit metadata wins; otherwise inherit the Memory defaults.
+        meta.setdefault("user_id", self.user_id)
+        if self.namespace is not None:
+            meta.setdefault("namespace", self.namespace)
 
         entry = MemoryEntry(
             content=text,
@@ -616,13 +646,61 @@ class Memory(BaseMemory):
         scope: Optional[Union[ScopeLike, Sequence[ScopeLike]]] = None,
         kind: Optional[str] = None,
         min_score: float = 0.0,
+        # ── Fase 2 parity ──
+        user_id: Optional[str] = None,
+        namespace: Optional[str] = None,
+        depth: str = "shallow",
+        limit: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """Return the ``top_k`` entries ranked by the composite score.
 
         ``scope`` accepts a single scope or a sequence of scopes; ``None``
         searches every scope. Results carry ``score``, ``similarity``,
         ``recency`` and ``importance`` so callers can explain a ranking.
+
+        ``depth="deep"`` does a second pass with sub-queries when the query
+        is long (``len(query) >= query_analysis_threshold``) or confidence
+        is low, then merges the best candidates — a lightweight version of
+        CrewAI's RecallFlow.
         """
+        top_k = limit if limit is not None else top_k
+        active_user = user_id if user_id is not None else self.user_id
+        results = self._search_once(query, top_k=top_k, scope=scope, kind=kind, min_score=min_score, user_id=active_user, namespace=namespace)
+        if depth == "deep":
+            sub_queries = self._expand_query(query)
+            if sub_queries:
+                seen = {r["id"] for r in results}
+                for sq in sub_queries[:2]:
+                    for r in self._search_once(sq, top_k=top_k, scope=scope, kind=kind, min_score=min_score, user_id=active_user, namespace=namespace):
+                        if r["id"] not in seen:
+                            seen.add(r["id"])
+                            results.append(r)
+                results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+                results = results[:top_k]
+            # Confidence annotation (CrewAI-parity): high/low thresholds.
+            for r in results:
+                s = float(r.get("score", 0.0))
+                if s >= self.confidence_threshold_high:
+                    r["confidence"] = "high"
+                elif s <= self.confidence_threshold_low:
+                    r["confidence"] = "low"
+                else:
+                    r["confidence"] = "medium"
+        else:
+            for r in results:
+                r.setdefault("confidence", "shallow")
+        return results
+
+    def _search_once(
+        self,
+        query: str,
+        top_k: int = 5,
+        scope: Optional[Union[ScopeLike, Sequence[ScopeLike]]] = None,
+        kind: Optional[str] = None,
+        min_score: float = 0.0,
+        user_id: Optional[str] = None,
+        namespace: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         scopes = self._coerce_scope_filter(scope)
         now = datetime.now()
         query_vec = self._embed(query) if self.embedding is not None else None
@@ -637,6 +715,16 @@ class Memory(BaseMemory):
                 continue
             if kind is not None and entry.kind != kind:
                 continue
+            # Multi-user / namespace isolation: an entry with a user_id is
+            # only visible to the same user; same rule for namespace prefix.
+            if user_id is not None:
+                entry_user = (entry.metadata or {}).get("user_id")
+                if entry_user is not None and entry_user != user_id:
+                    continue
+            if namespace is not None:
+                entry_ns = (entry.metadata or {}).get("namespace")
+                if entry_ns is not None and not str(entry_ns).startswith(str(namespace)):
+                    continue
 
             similarity = self._similarity_to_query(entry, query_vec, query_tokens)
             recency = self._recency(entry, now)
@@ -683,6 +771,75 @@ class Memory(BaseMemory):
             return ""
         lines = [f"- {r.get('content', '')}" for r in results]
         return "Relevant memories:\n" + "\n".join(lines)
+
+    # ── CrewAI-parity aliases (Fase 2) ───────────────────────────────
+
+    def remember(self, content: str, metadata: Optional[Dict[str, Any]] = None, **kwargs: Any) -> str:
+        """CrewAI alias for :meth:`add`."""
+        if kwargs:
+            metadata = {**(metadata or {}), **kwargs}
+        return self.add(content, metadata=metadata)
+
+    def recall(self, query: str, top_k: int = 5, **kwargs: Any) -> List[Dict[str, Any]]:
+        """CrewAI alias for :meth:`search` (supports ``depth=``)."""
+        return self.search(query, top_k=top_k, **kwargs)
+
+    def forget(self, entry_id: str) -> bool:
+        """Delete one entry by id. Returns True when something was removed."""
+        with self._lock:
+            existed = entry_id in self._entries
+            self._entries.pop(entry_id, None)
+        if existed:
+            self._submit("delete", [entry_id])
+        return existed
+
+    def delete(self, ids: Sequence[str]) -> None:
+        """Delete several entries by id."""
+        with self._lock:
+            for i in ids:
+                self._entries.pop(i, None)
+        self._submit("delete", list(ids))
+
+    def remember_many(self, contents: Sequence[str], metadata: Optional[Dict[str, Any]] = None) -> List[str]:
+        """Batch insert with near-duplicate dropping (``batch_dedup_threshold``)."""
+        ids: List[str] = []
+        seen_texts: List[str] = []
+        for content in contents:
+            norm = (content or "").strip().lower()
+            if not norm:
+                continue
+            is_dup = False
+            for prev in seen_texts:
+                if _jaccard(_tokenize(norm), _tokenize(prev)) >= self.batch_dedup_threshold:
+                    is_dup = True
+                    break
+            if is_dup:
+                continue
+            seen_texts.append(norm)
+            eid = self.add(content, metadata=dict(metadata or {}))
+            if eid:
+                ids.append(eid)
+        return ids
+
+    def extract_memories(self, content: str) -> List[str]:
+        """CrewAI alias: split a blob into facts (uses :meth:`extract_facts`)."""
+        facts = self.extract_facts(content, "")
+        if facts:
+            return facts
+        # Fallback: one fact per non-empty line/sentence.
+        parts = [p.strip() for p in _SENTENCE_RE.split(content or "") if p.strip()]
+        return parts
+
+    def _expand_query(self, query: str) -> List[str]:
+        """Split long queries into sub-queries for deep recall."""
+        if len(query or "") < self.query_analysis_threshold:
+            return []
+        # Cheap LLM-free expansion: keywords + first sentences.
+        tokens = _tokenize(query)
+        if len(tokens) <= 6:
+            return []
+        mid = len(tokens) // 2
+        return [" ".join(tokens[:mid]), " ".join(tokens[mid:])]
 
     # ── interactions & facts ───────────────────────────────────────────
 

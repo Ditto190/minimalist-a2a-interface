@@ -19,13 +19,14 @@ Example::
 """
 
 from mangaba.knowledge.base import BaseKnowledgeSource
-from mangaba.knowledge.knowledge import Knowledge
+from mangaba.knowledge.knowledge import Knowledge, KnowledgeConfig
 from mangaba.knowledge.sources import (
     CSVKnowledgeSource,
     DirectoryKnowledgeSource,
     DOCXKnowledgeSource,
     ExcelKnowledgeSource,
     JSONKnowledgeSource,
+    MarkdownKnowledgeSource,
     PDFKnowledgeSource,
     StringKnowledgeSource,
     TextFileKnowledgeSource,
@@ -35,8 +36,10 @@ from mangaba.knowledge.sources import (
 __all__ = [
     "BaseKnowledgeSource",
     "Knowledge",
+    "KnowledgeConfig",
     "StringKnowledgeSource",
     "TextFileKnowledgeSource",
+    "MarkdownKnowledgeSource",
     "PDFKnowledgeSource",
     "DOCXKnowledgeSource",
     "CSVKnowledgeSource",

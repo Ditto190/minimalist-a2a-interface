@@ -124,6 +124,13 @@ class Agent:
         inject_date: bool = False,
         date_format: str = "%Y-%m-%d",
         training_context: Optional[str] = None,
+        # ── CrewAI-parity aliases ──
+        max_iter: Optional[int] = None,
+        max_retry_limit: Optional[int] = None,
+        cache: bool = True,
+        function_calling_llm: Optional[Any] = None,
+        embedder: Optional[Any] = None,
+        use_system_prompt: bool = True,
     ) -> None:
         if not role or not role.strip():
             raise ValueError("Role cannot be empty")
@@ -137,10 +144,17 @@ class Agent:
         self.backstory = backstory.strip()
         self.tools: List[BaseTool] = list(tools or [])
         self.verbose = verbose
-        self.max_iterations = max_iterations
-        self.max_retry_on_error = max_retry_on_error
+        # CrewAI aliases: max_iter -> max_iterations, max_retry_limit -> max_retry_on_error
+        self.max_iterations = max_iter if max_iter is not None else max_iterations
+        self.max_iter = self.max_iterations
+        self.max_retry_on_error = max_retry_limit if max_retry_limit is not None else max_retry_on_error
+        self.max_retry_limit = self.max_retry_on_error
         self.allow_delegation = allow_delegation
         self.step_callback = step_callback
+        self.cache = cache
+        self.function_calling_llm = function_calling_llm
+        self.embedder = embedder
+        self.use_system_prompt = use_system_prompt
         self.guardrails = guardrails or []
         self.output_parser = output_parser
         self.memory = memory
@@ -293,6 +307,12 @@ class Agent:
                         metadata={"agent": self.role, "type": "task_result"},
                     )
 
+                if self.step_callback is not None:
+                    try:
+                        self.step_callback({"role": self.role, "task": task_description, "output": str(result_text), "attempt": attempt})
+                    except Exception:
+                        log.debug("step_callback failed", exc_info=True)
+
                 EventBus.emit(Event(
                     event_type=EventType.AGENT_END,
                     source_id=self.agent_id,
@@ -318,6 +338,15 @@ class Agent:
         """Register another agent as a peer for delegation."""
         self._peers[other.agent_id] = other
         other._peers[self.agent_id] = self
+
+    def kickoff(self, message: str, context: Optional[str] = None, images: Optional[List[ImageContent]] = None) -> str:
+        """Talk to the agent directly without a Task/Crew (CrewAI-parity)."""
+        return self.execute_task(message, context, images=images)
+
+    async def akickoff(self, message: str, context: Optional[str] = None, images: Optional[List[ImageContent]] = None) -> str:
+        """Async version of :meth:`kickoff`."""
+        import asyncio
+        return await asyncio.to_thread(self.execute_task, message, context, images)
 
     def delegate(self, peer_id: str, task_description: str, context: Optional[str] = None) -> str:
         """Delegate a task to a connected peer agent."""
