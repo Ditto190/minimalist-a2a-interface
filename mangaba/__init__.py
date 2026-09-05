@@ -99,6 +99,8 @@ from mangaba.knowledge import (
     ExcelKnowledgeSource,
     JSONKnowledgeSource,
     Knowledge,
+    KnowledgeConfig,
+    MarkdownKnowledgeSource,
     PDFKnowledgeSource,
     StringKnowledgeSource,
     TextFileKnowledgeSource,
@@ -107,9 +109,11 @@ from mangaba.knowledge import (
 
 # ── Memory ─────────────────────────────────────────────────────────────
 from mangaba.memory import (
+    BaseExternalMemory,
     EntityMemory,
     InMemoryBackend,
     LongTermMemory,
+    Mem0Memory,
     Memory,
     MemoryScope,
     MemoryWeights,
@@ -219,9 +223,11 @@ __all__ = [
     "HumanFeedback",
     # Knowledge
     "Knowledge",
+    "KnowledgeConfig",
     "BaseKnowledgeSource",
     "StringKnowledgeSource",
     "TextFileKnowledgeSource",
+    "MarkdownKnowledgeSource",
     "PDFKnowledgeSource",
     "DOCXKnowledgeSource",
     "CSVKnowledgeSource",
@@ -235,6 +241,8 @@ __all__ = [
     "MemoryWeights",
     "InMemoryBackend",
     "SQLiteBackend",
+    "BaseExternalMemory",
+    "Mem0Memory",
     "ShortTermMemory",
     "LongTermMemory",
     "EntityMemory",

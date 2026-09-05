@@ -141,6 +141,28 @@ def build_parser() -> argparse.ArgumentParser:
     reset.add_argument("--all", action="store_true", help="everything above plus training data")
     reset.set_defaults(func=cmd_reset_memories)
 
+    # ── replay ─────────────────────────────────────────────────────────
+    replay = subparsers.add_parser(
+        "replay", help="re-run the crew from a specific task id",
+        description="Replay execution starting at the given task id, reusing prior outputs.",
+    )
+    replay.add_argument("--path", default=".", help="project directory (default: current directory)")
+    replay.add_argument("-t", "--task-id", required=True, help="task id to replay from")
+    replay.add_argument(
+        "-i", "--input", action="append", default=[], metavar="KEY=VALUE",
+        help="input passed to the crew (repeatable)",
+    )
+    replay.set_defaults(func=cmd_replay)
+
+    # ── install ────────────────────────────────────────────────────────
+    install = subparsers.add_parser(
+        "install", help="install project dependencies",
+        description="Install the extras the project template needs (yaml, documents, etc).",
+    )
+    install.add_argument("--path", default=".", help="project directory (default: current directory)")
+    install.add_argument("--all", action="store_true", help="install mangaba[all] instead of the base extras")
+    install.set_defaults(func=cmd_install)
+
     # ── config ─────────────────────────────────────────────────────────
     config = subparsers.add_parser(
         "config", help="show the resolved provider, model and key presence",
@@ -215,6 +237,31 @@ def cmd_version(args: argparse.Namespace) -> int:
     py = "%d.%d.%d" % sys.version_info[:3]
     print(f"mangaba {__version__} (Python {py})")
     return EXIT_OK
+
+
+def cmd_replay(args: argparse.Namespace) -> int:
+    """Replay the crew from a given task id."""
+    from mangaba.config_loader import load_project
+
+    project = load_project(args.path)
+    inputs = _merge_inputs(project.inputs, args.input)
+    output = project.crew.replay(task_id=args.task_id, inputs=inputs or None)
+    print("")
+    print("===== Final output =====")
+    print(output.final_output)
+    print("")
+    print("Replayed from task %s (%d task output(s))" % (args.task_id, len(output.tasks_outputs)))
+    return EXIT_OK
+
+
+def cmd_install(args: argparse.Namespace) -> int:
+    """Install project dependencies via pip."""
+    import subprocess
+
+    package = "mangaba[all]" if args.all else "mangaba[yaml,documents]"
+    print(f"Installing {package} ...")
+    result = subprocess.run([sys.executable, "-m", "pip", "install", package])
+    return EXIT_OK if result.returncode == 0 else EXIT_ERROR
 
 
 def cmd_test(args: argparse.Namespace) -> int:

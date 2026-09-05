@@ -34,13 +34,35 @@ class TaskOutput:
         result: str,
         agent: str,
         success: bool = True,
+        task_id: Optional[str] = None,
+        pydantic: Optional[Any] = None,
+        json_dict: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.description = description
         self.result = result
         self.agent = agent
         self.success = success
+        self.task_id = task_id
+        self.pydantic = pydantic
+        self.json_dict = json_dict
         from datetime import datetime
         self.timestamp = datetime.now().isoformat()
+
+    @property
+    def raw(self) -> str:
+        """Raw string output (CrewAI-compatible alias)."""
+        return self.result
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "description": self.description,
+            "result": self.result,
+            "agent": self.agent,
+            "success": self.success,
+            "task_id": self.task_id,
+            "json_dict": self.json_dict,
+            "timestamp": self.timestamp,
+        }
 
     def __str__(self) -> str:
         return self.result
@@ -79,6 +101,13 @@ class Task:
         max_human_iterations: int = 3,
         guardrail_max_retries: int = 3,
         images: Optional[List[ImageContent]] = None,
+        # ── CrewAI-parity aliases ──
+        output_pydantic: Optional[Any] = None,
+        output_json: Optional[Any] = None,
+        guardrail: Optional[Any] = None,
+        max_retries: Optional[int] = None,
+        depends_on: Optional[List[Task]] = None,
+        condition: Optional[Callable[[Dict[str, Any]], bool]] = None,
     ) -> None:
         if not description or not description.strip():
             raise ValueError("Task description cannot be empty")
@@ -89,19 +118,47 @@ class Task:
         self.description = description.strip()
         self.expected_output = expected_output.strip()
         self.agent = agent
-        self.context: List[Task] = context or []
+        # CrewAI uses `depends_on`; Mangaba uses `context`. Accept both.
+        merged_context: List[Task] = list(context or [])
+        for dep in depends_on or []:
+            if dep not in merged_context:
+                merged_context.append(dep)
+        self.context: List[Task] = merged_context
         self.tools: List[BaseTool] = tools or []
         self.output_file = output_file
         self.callback = callback
         self.async_execution = async_execution
         self.human_input = human_input
-        self.guardrails: List[BaseGuardrail] = guardrails or []
+        # Accept both `guardrail=` (singular) and `guardrails=` (plural).
+        merged_guardrails: List[BaseGuardrail] = list(guardrails or [])
+        if guardrail is not None:
+            if isinstance(guardrail, (list, tuple)):
+                merged_guardrails.extend(guardrail)
+            else:
+                merged_guardrails.append(guardrail)
+        self.guardrails: List[BaseGuardrail] = merged_guardrails
         self.output_parser = output_parser
-        self.retry_on_failure = retry_on_failure
+        # CrewAI structured-output shortcuts build a parser automatically.
+        if self.output_parser is None and output_pydantic is not None:
+            from mangaba.core.output_parsers import PydanticOutputParser
+            model = output_pydantic if isinstance(output_pydantic, type) else type(output_pydantic)
+            try:
+                self.output_parser = PydanticOutputParser(model)
+            except Exception:
+                self.output_parser = None
+        if self.output_parser is None and output_json is not None:
+            from mangaba.core.output_parsers import JSONOutputParser
+            self.output_parser = JSONOutputParser()
+        self.output_pydantic = output_pydantic
+        self.output_json = output_json
+        # `max_retries` is the CrewAI name; `retry_on_failure` is Mangaba's.
+        self.retry_on_failure = max_retries if max_retries is not None else retry_on_failure
+        self.max_retries = self.retry_on_failure
         self.human_input_handler = human_input_handler
         self.max_human_iterations = max_human_iterations
         self.guardrail_max_retries = guardrail_max_retries
         self.images: List[ImageContent] = images or []
+        self.condition = condition
 
         # Runtime state
         self.status = "pending"
@@ -115,6 +172,28 @@ class Task:
         """Execute the task synchronously."""
         if not self.agent:
             raise TaskError("No agent assigned to this task")
+
+        # Conditional skip (CrewAI-parity): when condition returns False,
+        # mark as completed without calling the LLM.
+        if self.condition is not None:
+            try:
+                if not self.condition(inputs or {}):
+                    self.status = "skipped"
+                    self.output = TaskOutput(
+                        description=self.description,
+                        result="",
+                        agent=self.agent.role,
+                        success=True,
+                        task_id=self.task_id,
+                    )
+                    EventBus.emit(Event(
+                        event_type=EventType.TASK_END,
+                        source_id=self.task_id,
+                        data={"status": "skipped"},
+                    ))
+                    return self.output
+            except Exception as exc:
+                log.warning("Task condition failed: %s", exc)
 
         self.status = "running"
         EventBus.emit(Event(
@@ -136,9 +215,24 @@ class Task:
 
                 result = self._run_with_guardrails(full_desc, context_str)
 
-                # Output parser
+                # Output parser (+ structured-output bookkeeping)
+                pydantic_obj: Optional[Any] = None
+                json_obj: Optional[Dict[str, Any]] = None
                 if self.output_parser:
-                    result = str(self.output_parser.parse(result))
+                    parsed = self.output_parser.parse(result)
+                    # PydanticOutputParser returns a BaseModel; JSON returns dict/list.
+                    try:
+                        from pydantic import BaseModel as _BM
+                        if isinstance(parsed, _BM):
+                            pydantic_obj = parsed
+                            json_obj = parsed.model_dump()
+                            result = parsed.model_dump_json()
+                        else:
+                            result = parsed if isinstance(parsed, str) else str(parsed) if not isinstance(parsed, (dict, list)) else __import__("json").dumps(parsed)
+                            if isinstance(parsed, dict):
+                                json_obj = parsed
+                    except Exception:
+                        result = str(parsed)
 
                 # Human review
                 if self.human_input:
@@ -146,9 +240,12 @@ class Task:
 
                 self.output = TaskOutput(
                     description=task_desc,
-                    result=result,
+                    result=result if isinstance(result, str) else str(result),
                     agent=self.agent.role,
                     success=True,
+                    task_id=self.task_id,
+                    pydantic=pydantic_obj,
+                    json_dict=json_obj,
                 )
 
                 if self.output_file:
@@ -177,6 +274,7 @@ class Task:
             result=f"Error: {last_err}",
             agent=self.agent.role if self.agent else "unknown",
             success=False,
+            task_id=self.task_id,
         )
         EventBus.emit(Event(
             event_type=EventType.TASK_ERROR,

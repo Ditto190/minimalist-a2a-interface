@@ -248,3 +248,12 @@ class DirectoryKnowledgeSource(BaseKnowledgeSource):
             loader_kwargs=self.loader_kwargs or None,
         )
         return self._finalize(loader.load())
+
+
+class MarkdownKnowledgeSource(TextFileKnowledgeSource):
+    """A Markdown file — alias with a clearer name (CrewAI-parity).
+
+    Example::
+
+        source = MarkdownKnowledgeSource(file_path="README.md")
+    """

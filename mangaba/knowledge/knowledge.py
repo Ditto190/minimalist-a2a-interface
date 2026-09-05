@@ -35,6 +35,32 @@ DEFAULT_RESULTS_LIMIT = 3
 DEFAULT_SCORE_THRESHOLD = 0.35
 
 
+class KnowledgeConfig:
+    """Declarative config for :class:`Knowledge` (CrewAI-parity).
+
+    Example::
+
+        cfg = KnowledgeConfig(collection_name="handbook", results_limit=5, score_threshold=0.4)
+        knowledge = Knowledge(embedding=emb, sources=[...], config=cfg)
+    """
+
+    def __init__(
+        self,
+        collection_name: str = DEFAULT_COLLECTION_NAME,
+        results_limit: int = DEFAULT_RESULTS_LIMIT,
+        score_threshold: float = DEFAULT_SCORE_THRESHOLD,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        storage_backend: str = DEFAULT_STORAGE_BACKEND,
+    ) -> None:
+        self.collection_name = collection_name
+        self.results_limit = results_limit
+        self.score_threshold = score_threshold
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.storage_backend = storage_backend
+
+
 class Knowledge:
     """A queryable collection of grounding documents.
 
@@ -81,7 +107,15 @@ class Knowledge:
         chunk_overlap: int = 200,
         splitter: Optional[RecursiveTextSplitter] = None,
         storage_backend: str = DEFAULT_STORAGE_BACKEND,
+        config: Optional[KnowledgeConfig] = None,
     ) -> None:
+        if config is not None:
+            collection_name = config.collection_name
+            results_limit = config.results_limit
+            score_threshold = config.score_threshold
+            chunk_size = config.chunk_size
+            chunk_overlap = config.chunk_overlap
+            storage_backend = config.storage_backend
         self.embedding = embedding
         self.collection_name = collection_name
         self.results_limit = results_limit
