@@ -123,12 +123,20 @@ from mangaba.memory import (
 
 # ── Observability ──────────────────────────────────────────────────────
 from mangaba.observability import (
+    AuditCallback,
+    AuditLogger,
     LangfuseCallback,
     MLflowCallback,
     OpenTelemetryCallback,
     PhoenixCallback,
+    Role,
     auto_configure_from_env,
     configure_observability,
+    contains_pii,
+    estimate_cost,
+    prometheus_text,
+    redact_pii,
+    require_role,
 )
 
 # ── Training & evaluation ──────────────────────────────────────────────
@@ -251,6 +259,14 @@ __all__ = [
     "LangfuseCallback",
     "MLflowCallback",
     "PhoenixCallback",
+    "redact_pii",
+    "contains_pii",
+    "AuditLogger",
+    "AuditCallback",
+    "Role",
+    "require_role",
+    "estimate_cost",
+    "prometheus_text",
     "configure_observability",
     "auto_configure_from_env",
     # Training

@@ -58,6 +58,22 @@ class CrewOutput:
         """CrewAI-compatible alias for the final string output."""
         return self.final_output
 
+    def cost(self, model: str = "default") -> float:
+        """Estimated USD cost for this run (offline price table)."""
+        try:
+            from mangaba.observability.metrics import estimate_cost
+            return estimate_cost(self.token_usage, model=model)
+        except Exception:
+            return 0.0
+
+    def prometheus(self, model: str = "default") -> str:
+        """Prometheus exposition text for this run."""
+        try:
+            from mangaba.observability.metrics import estimate_cost, prometheus_text
+            return prometheus_text(self.crew_id, self.token_usage, cost_usd=estimate_cost(self.token_usage, model=model), duration_s=self.duration)
+        except Exception:
+            return ""
+
     @property
     def pydantic(self) -> Optional[Any]:
         if self.tasks_outputs:
